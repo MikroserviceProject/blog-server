@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Authentication/">
+    <Project Path="Authentication.API/Authentication.API.csproj" Id="c1531d15-8cf4-4b91-898b-05289c8974d5" />
+    <Project Path="Authentication.Core/Authentication.Core.csproj" DisplayName="Authentication.CORE" Id="379b106f-34cd-4c9f-9bda-54b44b16d53c" />
+  </Folder>
+  <Folder Name="/BlogSite/">
+    <Project Path="BlogSite.API/BlogSite.API.csproj" Id="35c52d50-8d70-49a8-b03e-8c1549bf8b05" />
+    <Project Path="BlogSite.Core/BlogSite.Core.csproj" DisplayName="BlogSite.CORE" Id="8c5f0ebd-e5c8-4f5d-aa68-c200de058d23" />
+  </Folder>
+  <Project Path="Blog.Gateway/Blog.Gateway.csproj" />
+</Solution>
