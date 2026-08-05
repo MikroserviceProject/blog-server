@@ -57,15 +57,24 @@ namespace BlogSite.API.Controllers
         // POST: api/posts
         // [Authorize(Roles = "Admin")]
         [HttpPost]
-        public async Task<ActionResult<PostResponseDto>> CreatePost(CreatePostDto dto)
+        [Consumes("multipart/form-data")]
+        public async Task<ActionResult<PostResponseDto>> CreatePost([FromForm] CreatePostDto dto, IFormFile? photo)
         {
             var post = new Post
             {
                 Title = dto.Title,
                 Content = dto.Content,
-                Type = dto.Type,
-                PhotoUrl = dto.PhotoUrl
+                Type = dto.Type
             };
+
+            if (photo != null)
+            {
+                var (photoUrl, error) = await TrySavePhotoAsync(photo);
+                if (error != null)
+                    return BadRequest(error);
+
+                post.PhotoUrl = photoUrl;
+            }
 
             _context.Posts.Add(post);
             await _context.SaveChangesAsync();
@@ -111,27 +120,19 @@ namespace BlogSite.API.Controllers
             return NoContent();
         }
 
-        // POST: api/posts/5/photo
-        // [Authorize(Roles = "Admin")]
-        [HttpPost("{id}/photo")]
-        public async Task<ActionResult<PostResponseDto>> UploadPhoto(int id, IFormFile file)
+        private async Task<(string? PhotoUrl, string? Error)> TrySavePhotoAsync(IFormFile file)
         {
-            var post = await _context.Posts.FindAsync(id);
-
-            if (post == null)
-                return NotFound();
-
-            if (file == null || file.Length == 0)
-                return BadRequest("Yüklenecek bir dosya seçilmedi.");
+            if (file.Length == 0)
+                return (null, "Yüklenecek dosya boş.");
 
             if (file.Length > MaxPhotoSizeBytes)
-                return BadRequest("Dosya boyutu 5 MB'ı geçemez.");
+                return (null, "Dosya boyutu 5 MB'ı geçemez.");
 
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             if (!AllowedPhotoExtensions.Contains(extension))
-                return BadRequest("Sadece jpg, jpeg, png, gif veya webp uzantılı resim dosyaları yüklenebilir.");
+                return (null, "Sadece jpg, jpeg, png, gif veya webp uzantılı resim dosyaları yüklenebilir.");
 
-            var uploadsFolder = Path.Combine(_environment.WebRootPath ?? _environment.ContentRootPath, "uploads", "posts");
+            var uploadsFolder = Path.Combine(_environment.ContentRootPath, "wwwroot", "uploads", "posts");
             Directory.CreateDirectory(uploadsFolder);
 
             var fileName = $"{Guid.NewGuid()}{extension}";
@@ -142,11 +143,7 @@ namespace BlogSite.API.Controllers
                 await file.CopyToAsync(stream);
             }
 
-            post.PhotoUrl = $"/uploads/posts/{fileName}";
-            post.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            return Ok(ToResponseDto(post));
+            return ($"/uploads/posts/{fileName}", null);
         }
 
         private static PostResponseDto ToResponseDto(Post post) => new()
