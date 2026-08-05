@@ -11,11 +11,16 @@ namespace BlogSite.API.Controllers
     [Route("api/posts")]
     public class PostsController : ControllerBase
     {
-        private readonly BlogDbContext _context;
+        private static readonly string[] AllowedPhotoExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        private const long MaxPhotoSizeBytes = 5 * 1024 * 1024; // 5 MB
 
-        public PostsController(BlogDbContext context)
+        private readonly BlogDbContext _context;
+        private readonly IWebHostEnvironment _environment;
+
+        public PostsController(BlogDbContext context, IWebHostEnvironment environment)
         {
             _context = context;
+            _environment = environment;
         }
 
         // GET: api/posts?status=Published&type=Blog
@@ -104,6 +109,44 @@ namespace BlogSite.API.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // POST: api/posts/5/photo
+        // [Authorize(Roles = "Admin")]
+        [HttpPost("{id}/photo")]
+        public async Task<ActionResult<PostResponseDto>> UploadPhoto(int id, IFormFile file)
+        {
+            var post = await _context.Posts.FindAsync(id);
+
+            if (post == null)
+                return NotFound();
+
+            if (file == null || file.Length == 0)
+                return BadRequest("Yüklenecek bir dosya seçilmedi.");
+
+            if (file.Length > MaxPhotoSizeBytes)
+                return BadRequest("Dosya boyutu 5 MB'ı geçemez.");
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!AllowedPhotoExtensions.Contains(extension))
+                return BadRequest("Sadece jpg, jpeg, png, gif veya webp uzantılı resim dosyaları yüklenebilir.");
+
+            var uploadsFolder = Path.Combine(_environment.WebRootPath ?? _environment.ContentRootPath, "uploads", "posts");
+            Directory.CreateDirectory(uploadsFolder);
+
+            var fileName = $"{Guid.NewGuid()}{extension}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            await using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            post.PhotoUrl = $"/uploads/posts/{fileName}";
+            post.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(ToResponseDto(post));
         }
 
         private static PostResponseDto ToResponseDto(Post post) => new()
