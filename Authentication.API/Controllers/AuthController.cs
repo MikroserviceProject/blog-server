@@ -525,28 +525,4 @@ public class AuthController : ControllerBase
 
     #endregion
 
-    /// <summary>
-    /// Geliştirme ekranında veritabanı tablosundaki tüm kayıtları listeler.
-    /// </summary>
-    [HttpGet("database-users")]
-    public async Task<IActionResult> GetDatabaseUsers([FromServices] AuthenticationService.Core.Data.AppDbContext context)
-    {
-        var users = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
-            context.Users.Select(u => new 
-            {
-                u.Id,
-                u.Username,
-                u.Email,
-                u.Role,
-                u.University,
-                u.CvUrl,
-                u.AuthorApprovalStatus,
-                u.AuthorApplicationDate,
-                u.CreatedAt,
-                u.IsEmailConfirmed
-            })
-        );
-
-        return Ok(users);
-    }
 }
