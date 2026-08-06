@@ -3,6 +3,8 @@ using AuthenticationService.Core.DTOs;
 using AuthenticationService.Core.Entities;
 using AuthenticationService.Core.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace AuthenticationService.Core.Services;
 
@@ -12,12 +14,8 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtService _jwtService;
     private readonly IEmailService _emailService;
-
-    // Sistemin tanıdığı tüm roller
-    private static readonly HashSet<string> AllSystemRoles = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "User", "Author", "Admin"
-    };
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<AuthService> _logger;
 
     // Doğrudan kayıt formu ile seçilebilen roller (Admin güvenlik nedeniyle hariçtir)
     private static readonly HashSet<string> AllowedPublicRegisterRoles = new(StringComparer.OrdinalIgnoreCase)
@@ -29,12 +27,16 @@ public class AuthService : IAuthService
         AppDbContext context,
         IPasswordHasher passwordHasher,
         IJwtService jwtService,
-        IEmailService emailService)
+        IEmailService emailService,
+        IConfiguration configuration,
+        ILogger<AuthService> logger)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _jwtService = jwtService;
         _emailService = emailService;
+        _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<ApiResponseDto<UserDto>> RegisterAsync(RegisterRequestDto request)
@@ -270,7 +272,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SMTP Hata]: {ex.Message}");
+            _logger.LogError(ex, "Doğrulama e-postası gönderilirken hata oluştu: {Email}", user.Email);
         }
 
         return ApiResponseDto<bool>.Ok(true, "Yeni doğrulama bağlantısı e-posta adresinize gönderildi.");
@@ -325,7 +327,7 @@ public class AuthService : IAuthService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SMTP Hata]: {ex.Message}");
+                _logger.LogError(ex, "Profil güncellemesi sonrası doğrulama e-postası gönderilirken hata oluştu: {Email}", user.Email);
             }
 
             message = "E-posta adresiniz değiştiği için yeni adresinize doğrulama bağlantısı gönderildi. Güvenliğiniz için oturumunuz kapatıldı, lütfen e-postanızı doğrulayarak tekrar giriş yapınız.";
@@ -402,7 +404,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SMTP Hata]: {ex.Message}");
+            _logger.LogError(ex, "Şifre sıfırlama e-postası gönderilirken hata oluştu: {Email}", user.Email);
         }
 
         return ApiResponseDto<bool>.Ok(true, "Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.");
@@ -532,7 +534,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SMTP Hata]: {ex.Message}");
+            _logger.LogError(ex, "Yazar onay e-postası gönderilirken hata oluştu: {Email}", user.Email);
         }
 
         return ApiResponseDto<bool>.Ok(true, $"'{user.Username}' kullanıcısının yazar başvurusu onaylandı ve aktivasyon e-postası gönderildi.");
@@ -557,7 +559,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SMTP Hata]: {ex.Message}");
+            _logger.LogError(ex, "Yazar red e-postası gönderilirken hata oluştu: {Email}", user.Email);
         }
 
         return ApiResponseDto<bool>.Ok(true, $"'{user.Username}' kullanıcısının yazar başvurusu reddedildi.");
@@ -565,6 +567,13 @@ public class AuthService : IAuthService
 
     public async Task<ApiResponseDto<UserDto>> CreateAdminAsync(CreateAdminRequestDto request)
     {
+        // 0. Yönetici Güvenlik Anahtarı kontrolü
+        var expectedAdminKey = _configuration["AdminSecretKey"] ?? "LuminaAdmin2026!*";
+        if (string.IsNullOrWhiteSpace(request.AdminSecretKey) || request.AdminSecretKey != expectedAdminKey)
+        {
+            return ApiResponseDto<UserDto>.Fail("Geçersiz yönetici güvenlik anahtarı (AdminSecretKey).");
+        }
+
         // 1. Şifre kuralları kontrolü
         var passwordErrors = ValidatePasswordStrength(request.Password);
         if (passwordErrors.Count > 0)

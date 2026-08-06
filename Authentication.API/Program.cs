@@ -69,69 +69,69 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Veritabanını Başlat: Tablo oluştur ve varsayılan Admin kullanıcısını oluştur
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-    try
-    {
-        try { db.Database.Migrate(); }
-        catch (Exception migEx) { Console.WriteLine($"[Migration Uyarısı]: {migEx.Message}"); }
+// using (var scope = app.Services.CreateScope())
+// {
+//     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+//     var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+//     try
+//     {
+//         try { db.Database.Migrate(); }
+//         catch (Exception migEx) { app.Logger.LogWarning(migEx, "Migration sırasında uyarı oluştu."); }
 
-        db.Database.ExecuteSqlRaw("""
-            CREATE TABLE IF NOT EXISTS "Users" (
-                "Id" uuid NOT NULL PRIMARY KEY,
-                "Username" character varying(50) NOT NULL,
-                "Email" character varying(100) NOT NULL,
-                "PasswordHash" text NOT NULL,
-                "Role" character varying(20) NOT NULL DEFAULT 'User',
-                "IsEmailConfirmed" boolean NOT NULL DEFAULT FALSE,
-                "EmailConfirmationToken" text NULL,
-                "EmailConfirmationTokenExpiresAt" timestamp with time zone NULL,
-                "CurrentSessionToken" text NULL,
-                "ProfilePictureUrl" text NULL,
-                "University" text NULL,
-                "CvUrl" text NULL,
-                "AuthorApprovalStatus" character varying(20) NULL,
-                "AuthorApplicationDate" timestamp with time zone NULL,
-                "AuthorRejectionReason" text NULL,
-                "PasswordResetToken" text NULL,
-                "PasswordResetTokenExpiresAt" timestamp with time zone NULL,
-                "CreatedAt" timestamp with time zone NOT NULL DEFAULT (now() at time zone 'utc'),
-                "LastLoginAt" timestamp with time zone NULL
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Email" ON "Users" ("Email");
-            CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username" ON "Users" ("Username");
-            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "University" text NULL;
-            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "CvUrl" text NULL;
-            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "AuthorApprovalStatus" character varying(20) NULL;
-            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "AuthorApplicationDate" timestamp with time zone NULL;
-            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "AuthorRejectionReason" text NULL;
-            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "PasswordResetToken" text NULL;
-            ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "PasswordResetTokenExpiresAt" timestamp with time zone NULL;
-        """);
+//         db.Database.ExecuteSqlRaw("""
+//             CREATE TABLE IF NOT EXISTS "Users" (
+//                 "Id" uuid NOT NULL PRIMARY KEY,
+//                 "Username" character varying(50) NOT NULL,
+//                 "Email" character varying(100) NOT NULL,
+//                 "PasswordHash" text NOT NULL,
+//                 "Role" character varying(20) NOT NULL DEFAULT 'User',
+//                 "IsEmailConfirmed" boolean NOT NULL DEFAULT FALSE,
+//                 "EmailConfirmationToken" text NULL,
+//                 "EmailConfirmationTokenExpiresAt" timestamp with time zone NULL,
+//                 "CurrentSessionToken" text NULL,
+//                 "ProfilePictureUrl" text NULL,
+//                 "University" text NULL,
+//                 "CvUrl" text NULL,
+//                 "AuthorApprovalStatus" character varying(20) NULL,
+//                 "AuthorApplicationDate" timestamp with time zone NULL,
+//                 "AuthorRejectionReason" text NULL,
+//                 "PasswordResetToken" text NULL,
+//                 "PasswordResetTokenExpiresAt" timestamp with time zone NULL,
+//                 "CreatedAt" timestamp with time zone NOT NULL DEFAULT (now() at time zone 'utc'),
+//                 "LastLoginAt" timestamp with time zone NULL
+//             );
+//             CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Email" ON "Users" ("Email");
+//             CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username" ON "Users" ("Username");
+//             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "University" text NULL;
+//             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "CvUrl" text NULL;
+//             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "AuthorApprovalStatus" character varying(20) NULL;
+//             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "AuthorApplicationDate" timestamp with time zone NULL;
+//             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "AuthorRejectionReason" text NULL;
+//             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "PasswordResetToken" text NULL;
+//             ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "PasswordResetTokenExpiresAt" timestamp with time zone NULL;
+//         """);
 
-        Console.WriteLine("✅ [Veritabanı]: 'Users' tablosu hazır.");
+//         app.Logger.LogInformation("Veritabanı 'Users' tablosu hazır.");
 
-        // Varsayılan Admin Seed
-        if (!db.Users.Any(u => u.Role == "Admin"))
-        {
-            db.Users.Add(new AuthenticationService.Core.Entities.User
-            {
-                Id = Guid.NewGuid(),
-                Username = "admin",
-                Email = "admin@lumina.com",
-                PasswordHash = hasher.HashPassword("Admin123!*"),
-                Role = "Admin",
-                IsEmailConfirmed = true,
-                CreatedAt = DateTime.UtcNow
-            });
-            db.SaveChanges();
-            Console.WriteLine("✅ [Sistem]: Varsayılan Admin (admin / Admin123!*) oluşturuldu.");
-        }
-    }
-    catch (Exception ex) { Console.WriteLine($"[Veritabanı Uyarısı]: {ex.Message}"); }
-}
+//         // Varsayılan Admin Seed
+//         if (!db.Users.Any(u => u.Role == "Admin"))
+//         {
+//             db.Users.Add(new AuthenticationService.Core.Entities.User
+//             {
+//                 Id = Guid.NewGuid(),
+//                 Username = "admin",
+//                 Email = "admin@lumina.com",
+//                 PasswordHash = hasher.HashPassword("Admin123!*"),
+//                 Role = "Admin",
+//                 IsEmailConfirmed = true,
+//                 CreatedAt = DateTime.UtcNow
+//             });
+//             db.SaveChanges();
+//             app.Logger.LogInformation("Varsayılan Admin (admin / Admin123!*) oluşturuldu.");
+//         }
+//     }
+//     catch (Exception ex) { app.Logger.LogWarning(ex, "Veritabanı başlatma sırasında uyarı oluştu."); }
+// }
 
 app.UseCors();
 app.UseStaticFiles();

@@ -364,3 +364,5 @@ FodyWeavers.xsd
 
 # User-uploaded post photos (local disk storage, not source-controlled)
 BlogSite.API/wwwroot/uploads/
+Authentication.API/wwwroot/uploads/
+.dotnet/

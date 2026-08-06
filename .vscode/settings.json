@@ -1,6 +1,6 @@
 {
   "dotnet.defaultSolution": "BlogSiteForSoftwareHistory.slnx",
   "omnisharp.enableRoslynAnalyzers": true,
-  "omnisharp.organizeImportsOnFormat": true,
-  "csharp.inlayHints.enableInlayHintsForTypes": true
+  "csharp.inlayHints.enableInlayHintsForTypes": true,
+  "dotnet.formatting.organizeImportsOnFormat": true
 }
