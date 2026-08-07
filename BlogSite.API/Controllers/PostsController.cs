@@ -64,7 +64,8 @@ namespace BlogSite.API.Controllers
             {
                 Title = dto.Title,
                 Content = dto.Content,
-                Type = dto.Type
+                Type = dto.Type,
+                Status = dto.Status
             };
 
             if (photo != null)
@@ -85,17 +86,26 @@ namespace BlogSite.API.Controllers
         // PUT: api/posts/5
         // [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdatePost(int id, UpdatePostDto dto)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UpdatePost(int id, [FromForm] UpdatePostDto dto, IFormFile? photo)
         {
             var post = await _context.Posts.FindAsync(id);
 
             if (post == null)
                 return NotFound();
 
+            if (photo != null)
+            {
+                var (photoUrl, error) = await TrySavePhotoAsync(photo);
+                if (error != null)
+                    return BadRequest(error);
+
+                post.PhotoUrl = photoUrl;
+            }
+
             post.Title = dto.Title;
             post.Content = dto.Content;
-            post.Type = dto.Type;
-            post.PhotoUrl = dto.PhotoUrl;
+            post.Type = post.PhotoUrl != null ? PostType.Blog : PostType.Koseyazisi;
             post.Status = dto.Status;
             post.UpdatedAt = DateTime.UtcNow;
 
