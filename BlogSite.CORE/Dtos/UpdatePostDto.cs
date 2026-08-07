@@ -9,7 +9,5 @@ namespace BlogSite.CORE.Dtos
         public PostType Type { get; set; }
         public string? PhotoUrl { get; set; }
         public PostStatus Status { get; set; }
-        public string PhotoUrl { get; set; }
-        public PostType Type { get; set; }
     }
 }
