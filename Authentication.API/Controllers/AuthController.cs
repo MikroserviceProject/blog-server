@@ -87,7 +87,7 @@ public class AuthController : ControllerBase
         [FromForm] string email,
         [FromForm] string password,
         [FromForm] string university,
-        [FromForm] IFormFile? cvFile)
+         IFormFile? cvFile)
     {
         string? cvUrl = null;
 
@@ -353,7 +353,7 @@ public class AuthController : ControllerBase
     [HttpPost("upload-avatar")]
     [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UploadAvatar([FromForm] IFormFile? file, [FromQuery] string? avatarUrl = null)
+    public async Task<IActionResult> UploadAvatar( IFormFile? file, [FromQuery] string? avatarUrl = null)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
