@@ -12,6 +12,9 @@ public class UserDto
     public string? AuthorApprovalStatus { get; set; }
     public DateTime? AuthorApplicationDate { get; set; }
     public bool IsEmailConfirmed { get; set; }
+    public bool IsBanned { get; set; }
+    public DateTime? BannedUntil { get; set; }
+    public string? BanReason { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
 }

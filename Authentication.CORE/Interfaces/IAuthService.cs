@@ -18,9 +18,21 @@ public interface IAuthService
     Task<ApiResponseDto<bool>> ResetPasswordAsync(ResetPasswordRequestDto request);
     Task<ApiResponseDto<bool>> ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request);
 
-    // Admin Yönetimi
+    // Admin & Moderasyon Yönetimi
     Task<ApiResponseDto<UserDto>> CreateAdminAsync(CreateAdminRequestDto request);
     Task<ApiResponseDto<List<AuthorApplicationDto>>> GetAuthorApplicationsAsync();
     Task<ApiResponseDto<bool>> ApproveAuthorApplicationAsync(Guid authorId);
     Task<ApiResponseDto<bool>> RejectAuthorApplicationAsync(Guid authorId, string? reason);
+    Task<ApiResponseDto<List<UserDto>>> GetAllUsersAsync();
+    Task<ApiResponseDto<bool>> BanUserAsync(BanUserRequestDto request);
+    Task<ApiResponseDto<bool>> UnbanUserAsync(Guid userId);
+    Task<ApiResponseDto<bool>> SendAdminNotificationAsync(AdminSendNotificationDto request);
+
+    // Hesap Silme (Mail Onaylı)
+    Task<ApiResponseDto<bool>> RequestAccountDeletionAsync(Guid userId);
+    Task<ApiResponseDto<bool>> ConfirmAccountDeletionAsync(ConfirmAccountDeletionDto request);
+
+    // Bildirimler
+    Task<ApiResponseDto<List<UserNotificationDto>>> GetUserNotificationsAsync(Guid userId);
+    Task<ApiResponseDto<bool>> MarkNotificationAsReadAsync(Guid userId, Guid notificationId);
 }

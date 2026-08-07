@@ -68,6 +68,27 @@ public class User
     public string? PasswordResetToken { get; set; }
 
     public DateTime? PasswordResetTokenExpiresAt { get; set; }
+
+    /// <summary>
+    /// Kullanıcı ban / askıya alınma durumu
+    /// </summary>
+    public bool IsBanned { get; set; } = false;
+
+    /// <summary>
+    /// Ban bitiş tarihi. Eğer null ise süresiz ban.
+    /// </summary>
+    public DateTime? BannedUntil { get; set; }
+
+    /// <summary>
+    /// Admin tarafından yazılan banlanma / askıya alınma gerekçesi
+    /// </summary>
+    public string? BanReason { get; set; }
+
+    /// <summary>
+    /// Hesap silme onay token'ı ve son geçerlilik tarihi
+    /// </summary>
+    public string? AccountDeletionToken { get; set; }
+    public DateTime? AccountDeletionTokenExpiresAt { get; set; }
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
