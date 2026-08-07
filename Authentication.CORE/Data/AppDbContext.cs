@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +41,16 @@ public class AppDbContext : DbContext
             // Email ve Username için unique index tanımları
             entity.HasIndex(u => u.Email).IsUnique();
             entity.HasIndex(u => u.Username).IsUnique();
+        });
+
+        modelBuilder.Entity<UserNotification>(entity =>
+        {
+            entity.ToTable("UserNotifications");
+            entity.HasKey(n => n.Id);
+            entity.Property(n => n.Title).IsRequired().HasMaxLength(200);
+            entity.Property(n => n.Message).IsRequired();
+            entity.Property(n => n.Type).IsRequired().HasMaxLength(50);
+            entity.HasIndex(n => n.UserId);
         });
     }
 }

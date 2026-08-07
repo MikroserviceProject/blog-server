@@ -106,6 +106,69 @@ public class SmtpEmailService : IEmailService
         return await SendEmailAsync(toEmail, subject, body, isHtml: true);
     }
 
+    public async Task<bool> SendUserBannedEmailAsync(string toEmail, string username, string reason, DateTime? bannedUntil)
+    {
+        var subject = "⚠️ Lumina - Hesabınız Askıya Alındı";
+        var clientAppUrl = _configuration["ClientAppUrl"] ?? "http://localhost:4200";
+        var profileUrl = $"{clientAppUrl}/profile";
+
+        var durationInfo = bannedUntil.HasValue
+            ? $"<strong>Askı Süresi:</strong> {bannedUntil.Value:dd.MM.yyyy HH:mm} tarihine kadar sürelidir."
+            : "<strong>Askı Süresi:</strong> Süresiz (Kalıcı) olarak engellenmiştir.";
+
+        var body = GetMailTemplate(
+            title: "Hesabınız Askıya Alındı ⛔",
+            greeting: $"Sayın {System.Net.WebUtility.HtmlEncode(username)},",
+            message: $"Lumina platformundaki hesabınız yönetici kararıyla askıya alınmıştır.<br><br>" +
+                    $"<strong>Askıya Alınma Gerekçesi:</strong><br><blockquote style='background:#f1f5f9;padding:12px 16px;border-left:4px solid #ef4444;margin:12px 0;border-radius:4px;'>{System.Net.WebUtility.HtmlEncode(reason)}</blockquote><br>" +
+                    $"{durationInfo}<br><br>" +
+                    $"Askı süresi boyunca platform içeriklerine erişiminiz kısıtlanmıştır. Dilerseniz hesabınıza giriş yaparak hesabınızı kalıcı olarak silme talebinde bulunabilirsiniz.",
+            buttonText: "🔒 Hesabıma Git",
+            buttonUrl: profileUrl,
+            note: "Karara itiraz etmek veya detaylı bilgi almak için destek ekibiyle iletişime geçebilirsiniz."
+        );
+
+        return await SendEmailAsync(toEmail, subject, body, isHtml: true);
+    }
+
+    public async Task<bool> SendPostDeletedEmailAsync(string toEmail, string username, string postTitle, string reason)
+    {
+        var subject = "⚠️ Lumina - Yazınız Yayından Kaldırıldı";
+
+        var body = GetMailTemplate(
+            title: "Yazınız Yayından Kaldırıldı 🗑️",
+            greeting: $"Sayın {System.Net.WebUtility.HtmlEncode(username)},",
+            message: $"Lumina platformunda yayınlamış olduğunuz <strong>\"{System.Net.WebUtility.HtmlEncode(postTitle)}\"</strong> başlıklı yazınız topluluk ve yayın ilkeleri doğrultusunda yönetici tarafından yayından kaldırılmıştır.<br><br>" +
+                    $"<strong>Kaldırılma Gerekçesi:</strong><br><blockquote style='background:#f1f5f9;padding:12px 16px;border-left:4px solid #f59e0b;margin:12px 0;border-radius:4px;'>{System.Net.WebUtility.HtmlEncode(reason)}</blockquote><br>" +
+                    $"Platform kurallarına uygun içerikler paylaşarak yayın hayatınıza devam edebilirsiniz.",
+            buttonText: null,
+            buttonUrl: null,
+            note: "İçerik kurallarımız hakkında daha fazla bilgi almak için platform yönergelerimizi inceleyebilirsiniz."
+        );
+
+        return await SendEmailAsync(toEmail, subject, body, isHtml: true);
+    }
+
+    public async Task<bool> SendAccountDeletionConfirmationAsync(string toEmail, string username, string token)
+    {
+        var subject = "⚠️ Lumina - Hesap Silme Onayı";
+        var clientAppUrl = _configuration["ClientAppUrl"] ?? "http://localhost:4200";
+        var confirmDeleteUrl = $"{clientAppUrl}/confirm-delete-account?email={System.Net.WebUtility.UrlEncode(toEmail)}&token={System.Net.WebUtility.UrlEncode(token)}";
+
+        var body = GetMailTemplate(
+            title: "Hesap Silme Onayı ⚠️",
+            greeting: $"Sayın {System.Net.WebUtility.HtmlEncode(username)},",
+            message: "Lumina hesabınızı kalıcı olarak silme talebinde bulundunuz.<br><br>" +
+                    "<strong style='color:#ef4444;'>DİKKAT:</strong> Hesabınızı sildiğinizde profil bilgileriniz, oturumunuz ve platformdaki tüm yetkileriniz geri döndürülemez şekilde silinecektir.<br><br>" +
+                    "Hesabınızı kalıcı olarak silmek istiyorsanız aşağıdaki butona tıklayarak işlemi onaylayınız:",
+            buttonText: "🗑️ Hesabımı Kalıcı Olarak Sil",
+            buttonUrl: confirmDeleteUrl,
+            note: "Bu hesap silme bağlantısı güvenlik nedeniyle 1 saat süreyle geçerlidir. Bu talebi siz yapmadıysanız şifrenizi hemen değiştiriniz."
+        );
+
+        return await SendEmailAsync(toEmail, subject, body, isHtml: true);
+    }
+
     public async Task<bool> SendEmailAsync(string toEmail, string subject, string body, bool isHtml = true)
     {
         var host = _configuration["SmtpSettings:Host"];

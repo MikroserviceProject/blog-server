@@ -23,11 +23,12 @@ namespace BlogSite.API.Controllers
             _environment = environment;
         }
 
-        // GET: api/posts?status=Published&type=Blog
+        // GET: api/posts?status=Published&type=Blog&authorId=...
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PostResponseDto>>> GetPosts(
             [FromQuery] PostStatus? status,
-            [FromQuery] PostType? type)
+            [FromQuery] PostType? type,
+            [FromQuery] Guid? authorId)
         {
             var query = _context.Posts.AsQueryable();
 
@@ -37,7 +38,10 @@ namespace BlogSite.API.Controllers
             if (type.HasValue)
                 query = query.Where(p => p.Type == type.Value);
 
-            var posts = await query.ToListAsync();
+            if (authorId.HasValue && authorId.Value != Guid.Empty)
+                query = query.Where(p => p.AuthorId == authorId.Value);
+
+            var posts = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
 
             return Ok(posts.Select(ToResponseDto));
         }
@@ -55,7 +59,6 @@ namespace BlogSite.API.Controllers
         }
 
         // POST: api/posts
-        // [Authorize(Roles = "Admin")]
         [HttpPost]
         [Consumes("multipart/form-data")]
         public async Task<ActionResult<PostResponseDto>> CreatePost([FromForm] CreatePostDto dto, IFormFile? photo)
@@ -65,7 +68,8 @@ namespace BlogSite.API.Controllers
                 Title = dto.Title,
                 Content = dto.Content,
                 Type = dto.Type,
-                Status = dto.Status
+                Status = dto.Status,
+                AuthorId = dto.AuthorId
             };
 
             if (photo != null)
@@ -84,7 +88,6 @@ namespace BlogSite.API.Controllers
         }
 
         // PUT: api/posts/5
-        // [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UpdatePost(int id, [FromForm] UpdatePostDto dto, IFormFile? photo)
@@ -111,11 +114,44 @@ namespace BlogSite.API.Controllers
 
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(ToResponseDto(post));
+        }
+
+        // PUT: api/posts/5/with-photo
+        [HttpPut("{id}/with-photo")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UpdatePostWithPhoto(int id, [FromForm] UpdatePostDto dto, IFormFile? photo)
+        {
+            var post = await _context.Posts.FindAsync(id);
+
+            if (post == null)
+                return NotFound();
+
+            post.Title = dto.Title;
+            post.Content = dto.Content;
+            post.Type = dto.Type;
+            post.Status = dto.Status;
+            post.UpdatedAt = DateTime.UtcNow;
+
+            if (photo != null)
+            {
+                var (photoUrl, error) = await TrySavePhotoAsync(photo);
+                if (error != null)
+                    return BadRequest(error);
+
+                post.PhotoUrl = photoUrl;
+            }
+            else if (!string.IsNullOrEmpty(dto.PhotoUrl))
+            {
+                post.PhotoUrl = dto.PhotoUrl;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(ToResponseDto(post));
         }
 
         // DELETE: api/posts/5
-        // [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePost(int id)
         {
@@ -128,6 +164,21 @@ namespace BlogSite.API.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // POST: api/posts/5/admin-delete
+        [HttpPost("{id}/admin-delete")]
+        public async Task<IActionResult> AdminDeletePost(int id, [FromBody] AdminDeletePostDto dto)
+        {
+            var post = await _context.Posts.FindAsync(id);
+
+            if (post == null)
+                return NotFound(new { message = "Yazı bulunamadı." });
+
+            _context.Posts.Remove(post);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { success = true, message = $"'{post.Title}' başlıklı yazı kaldırıldı." });
         }
 
         private async Task<(string? PhotoUrl, string? Error)> TrySavePhotoAsync(IFormFile file)

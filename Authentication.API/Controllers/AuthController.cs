@@ -473,7 +473,7 @@ public class AuthController : ControllerBase
         return Ok(ApiResponseDto<bool>.Ok(true, "Oturum aktif."));
     }
 
-    #region Admin Yazar Başvuru Yönetim Endpoint'leri
+    #region Admin Yazar & Kullanıcı Moderasyon Endpoint'leri
 
     /// <summary>
     /// [Admin] Tüm yazar başvurularını listeler.
@@ -520,6 +520,188 @@ public class AuthController : ControllerBase
             return BadRequest(result);
         }
 
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// [Admin] Sistemdeki tüm kayıtlı kullanıcıları listeler.
+    /// </summary>
+    [Authorize(Roles = "Admin")]
+    [HttpGet("admin/users")]
+    [ProducesResponseType(typeof(ApiResponseDto<List<UserDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllUsers()
+    {
+        var result = await _authService.GetAllUsersAsync();
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// [Admin] Kullanıcıyı süreli veya süresiz askıya alır (banlar) ve mail gönderir.
+    /// </summary>
+    [Authorize(Roles = "Admin")]
+    [HttpPost("admin/ban-user")]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> BanUser([FromBody] BanUserRequestDto request)
+    {
+        if (request.UserId == Guid.Empty || string.IsNullOrWhiteSpace(request.GetEffectiveReason()))
+        {
+            return BadRequest(ApiResponseDto<bool>.Fail("Lütfen geçerli bir kullanıcı ve en az 3 karakterli ban gerekçesi belirtiniz."));
+        }
+
+        var result = await _authService.BanUserAsync(request);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// [Admin] Kullanıcının banını kaldırır.
+    /// </summary>
+    [Authorize(Roles = "Admin")]
+    [HttpPost("admin/unban-user/{id}")]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UnbanUser(Guid id)
+    {
+        var result = await _authService.UnbanUserAsync(id);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// [Admin] Kullanıcıya özel sistem içi bildirim / uyarı iletir.
+    /// </summary>
+    [Authorize(Roles = "Admin")]
+    [HttpPost("admin/notify-user")]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> NotifyUser([FromBody] AdminSendNotificationDto request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ApiResponseDto<bool>.Fail("Başlık ve mesaj içeriği zorunludur."));
+        }
+
+        var result = await _authService.SendAdminNotificationAsync(request);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    #endregion
+
+    #region Hesap Silme & Bildirim Endpoint'leri
+
+    /// <summary>
+    /// Kullanıcı hesap silme talebinde bulunur, e-posta adresine onay linki gönderilir.
+    /// </summary>
+    [Authorize]
+    [HttpPost("request-account-deletion")]
+    [HttpPost("request-delete-account")]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> RequestDeleteAccount()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(ApiResponseDto<bool>.Fail("Geçersiz oturum."));
+        }
+
+        var result = await _authService.RequestAccountDeletionAsync(userId);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// E-postadan gelen link tıklandığında (GET) frontend silme sayfasına yönlendirir.
+    /// </summary>
+    [HttpGet("confirm-account-deletion")]
+    [HttpGet("confirm-delete-account")]
+    public async Task<IActionResult> ConfirmDeleteAccountGet([FromQuery] string? email, [FromQuery] string? token)
+    {
+        var clientAppUrl = _configuration["ClientAppUrl"] ?? "http://localhost:4200";
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return Redirect($"{clientAppUrl}/confirm-delete-account?error={System.Net.WebUtility.UrlEncode("Geçersiz hesap silme bağlantısı.")}");
+        }
+
+        var emailParam = !string.IsNullOrWhiteSpace(email) ? $"&email={System.Net.WebUtility.UrlEncode(email)}" : "";
+        return Redirect($"{clientAppUrl}/confirm-delete-account?token={System.Net.WebUtility.UrlEncode(token)}{emailParam}");
+    }
+
+    /// <summary>
+    /// Token ve e-posta ile hesabı kalıcı olarak siler (POST).
+    /// </summary>
+    [HttpPost("confirm-account-deletion")]
+    [HttpPost("confirm-delete-account")]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConfirmDeleteAccount([FromBody] ConfirmAccountDeletionDto request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ApiResponseDto<bool>.Fail("Geçersiz e-posta veya token."));
+        }
+
+        var result = await _authService.ConfirmAccountDeletionAsync(request);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Kullanıcının sistem içi bildirimlerini listeler.
+    /// </summary>
+    [Authorize]
+    [HttpGet("notifications")]
+    [ProducesResponseType(typeof(ApiResponseDto<List<UserNotificationDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetNotifications()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(ApiResponseDto<List<UserNotificationDto>>.Fail("Geçersiz oturum."));
+        }
+
+        var result = await _authService.GetUserNotificationsAsync(userId);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Bildirimi okundu olarak işaretler.
+    /// </summary>
+    [Authorize]
+    [HttpPost("notifications/{id}/read")]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> MarkNotificationAsRead(Guid id)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(ApiResponseDto<bool>.Fail("Geçersiz oturum."));
+        }
+
+        var result = await _authService.MarkNotificationAsReadAsync(userId, id);
         return Ok(result);
     }
 
