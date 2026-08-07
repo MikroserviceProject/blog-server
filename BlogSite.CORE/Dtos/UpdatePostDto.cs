@@ -6,8 +6,6 @@ namespace BlogSite.CORE.Dtos
     {
         public string Title { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
-        public PostType Type { get; set; }
-        public string? PhotoUrl { get; set; }
         public PostStatus Status { get; set; }
     }
 }

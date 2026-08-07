@@ -57,7 +57,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // 5. OpenAPI / Scalar
-builder.Services.AddOpenApi();
+//builder.Services.AddOpenApi();
 
 // 6. CORS
 builder.Services.AddCors(options =>
@@ -142,7 +142,7 @@ app.UseMiddleware<RequestLoggingMiddleware>();
 // OpenAPI & Scalar (sadece Development ortamında)
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+
     app.MapScalarApiReference(options =>
     {
         options.WithTitle("Authentication Service API")
