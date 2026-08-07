@@ -57,7 +57,6 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // 5. OpenAPI, Swagger & Scalar
-builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -179,7 +178,7 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "swagger";
     });
 
-    app.MapOpenApi();
+    
     app.MapScalarApiReference(options =>
     {
         options.WithTitle("Authentication Service API")

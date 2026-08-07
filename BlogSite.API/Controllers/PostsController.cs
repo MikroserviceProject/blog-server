@@ -68,8 +68,7 @@ namespace BlogSite.API.Controllers
                 Title = dto.Title,
                 Content = dto.Content,
                 Type = dto.Type,
-                Status = dto.Status,
-                AuthorId = dto.AuthorId
+                Status = dto.Status
             };
 
             if (photo != null)
