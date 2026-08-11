@@ -215,7 +215,7 @@ public class AdminService : IAdminService
         var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
         var users = await query
-            .OrderByDescending(u => u.CreatedAt)
+            .OrderByDescending(u => u.CreatedAt).ThenByDescending(u => u.Id)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

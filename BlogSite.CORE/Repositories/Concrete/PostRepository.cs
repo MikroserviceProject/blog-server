@@ -31,7 +31,7 @@ namespace BlogSite.CORE.Repositories.Concrete
                 query = query.Where(p => p.Tags.Any(t => t.ToLower() == lowerTag));
             }
 
-            query = query.OrderByDescending(p => p.CreatedAt);
+            query = query.OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id);
             var totalCount = await query.CountAsync();
 
             if (page.HasValue && pageSize.HasValue && page.Value > 0 && pageSize.Value > 0)
