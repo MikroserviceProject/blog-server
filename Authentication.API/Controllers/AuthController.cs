@@ -1,8 +1,10 @@
 using System.Security.Claims;
+using AuthenticationService.Core.Data;
 using AuthenticationService.Core.DTOs;
 using AuthenticationService.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AuthenticationService.API.Controllers;
 
@@ -13,12 +15,14 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthController> _logger;
+    private readonly AppDbContext _dbContext;
 
-    public AuthController(IAuthService authService, IConfiguration configuration, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, IConfiguration configuration, ILogger<AuthController> logger, AppDbContext dbContext)
     {
         _authService = authService;
         _configuration = configuration;
         _logger = logger;
+        _dbContext = dbContext;
     }
 
     /// <summary>
@@ -431,6 +435,33 @@ public class AuthController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Bir kullanıcının herkese açık, hassas olmayan profil bilgilerini (kullanıcı adı, profil fotoğrafı)
+    /// getirir. Giriş yapmış olmaya gerek yok — blog yazarının bilgilerini göstermek gibi amaçlar için.
+    /// </summary>
+    [HttpGet("users/{id:guid}/public-profile")]
+    [ProducesResponseType(typeof(ApiResponseDto<PublicUserProfileDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<PublicUserProfileDto>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPublicUserProfile(Guid id)
+    {
+        var user = await _dbContext.Users
+            .Where(u => u.Id == id)
+            .Select(u => new PublicUserProfileDto
+            {
+                Id = u.Id,
+                Username = u.Username,
+                ProfilePictureUrl = u.ProfilePictureUrl
+            })
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+        {
+            return NotFound(ApiResponseDto<PublicUserProfileDto>.Fail("Kullanıcı bulunamadı."));
+        }
+
+        return Ok(ApiResponseDto<PublicUserProfileDto>.Ok(user));
     }
 
     /// <summary>

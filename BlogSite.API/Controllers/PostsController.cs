@@ -1,9 +1,9 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using BlogSite.CORE.Data;
 using BlogSite.CORE.Dtos;
-using BlogSite.CORE.Entities;
 using BlogSite.CORE.Enums;
+using BlogSite.CORE.Services;
 
 namespace BlogSite.API.Controllers
 {
@@ -14,170 +14,139 @@ namespace BlogSite.API.Controllers
         private static readonly string[] AllowedPhotoExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
         private const long MaxPhotoSizeBytes = 5 * 1024 * 1024; // 5 MB
 
-        private readonly BlogDbContext _context;
+        private readonly IPostService _postService;
         private readonly IWebHostEnvironment _environment;
 
-        public PostsController(BlogDbContext context, IWebHostEnvironment environment)
+        public PostsController(IPostService postService, IWebHostEnvironment environment)
         {
-            _context = context;
+            _postService = postService;
             _environment = environment;
         }
 
-        // GET: api/posts?status=Published&type=Blog&authorId=...
+        // GET: api/posts?status=Published&type=Blog&authorId=...&search=...
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PostResponseDto>>> GetPosts(
             [FromQuery] PostStatus? status,
             [FromQuery] PostType? type,
-            [FromQuery] Guid? authorId)
+            [FromQuery] Guid? authorId,
+            [FromQuery] string? search)
         {
-            var query = _context.Posts.AsQueryable();
+            var items = await _postService.GetPostsAsync(status, type, authorId, search);
+            return Ok(items);
+        }
 
-            if (status.HasValue)
-                query = query.Where(p => p.Status == status.Value);
-
-            if (type.HasValue)
-                query = query.Where(p => p.Type == type.Value);
-
-            if (authorId.HasValue && authorId.Value != Guid.Empty)
-                query = query.Where(p => p.AuthorId == authorId.Value);
-
-            var posts = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
-
-            return Ok(posts.Select(ToResponseDto));
+        // GET: api/posts/paged?status=Published&type=Blog&search=...&page=1&pageSize=9
+        [HttpGet("paged")]
+        public async Task<ActionResult<ApiResponseDto<PagedResultDto<PostResponseDto>>>> GetPagedPosts(
+            [FromQuery] PostStatus? status,
+            [FromQuery] PostType? type,
+            [FromQuery] Guid? authorId,
+            [FromQuery] string? search,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 9)
+        {
+            var result = await _postService.GetPagedPostsAsync(status, type, authorId, search, page, pageSize);
+            return Ok(ApiResponseDto<PagedResultDto<PostResponseDto>>.Ok(result));
         }
 
         // GET: api/posts/5
         [HttpGet("{id}")]
         public async Task<ActionResult<PostResponseDto>> GetPost(int id)
         {
-            var post = await _context.Posts.FindAsync(id);
-
-            if (post == null)
-                return NotFound();
-
-            return Ok(ToResponseDto(post));
+            var post = await _postService.GetPostAsync(id);
+            return post == null ? NotFound() : Ok(post);
         }
 
         // POST: api/posts
+        [Authorize(Roles = "Admin,Author")]
         [HttpPost]
         [Consumes("multipart/form-data")]
         public async Task<ActionResult<PostResponseDto>> CreatePost([FromForm] CreatePostDto dto, IFormFile? photo)
         {
-            var post = new Post
-            {
-                Title = dto.Title,
-                Content = dto.Content,
-                Type = dto.Type,
-                Status = dto.Status
-            };
-
+            string? photoUrl = null;
             if (photo != null)
             {
-                var (photoUrl, error) = await TrySavePhotoAsync(photo);
+                var (url, error) = await TrySavePhotoAsync(photo);
                 if (error != null)
                     return BadRequest(error);
 
-                post.PhotoUrl = photoUrl;
+                photoUrl = url;
             }
 
-            _context.Posts.Add(post);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetPost), new { id = post.Id }, ToResponseDto(post));
+            var created = await _postService.CreatePostAsync(dto, GetCurrentUserId(), photoUrl);
+            return CreatedAtAction(nameof(GetPost), new { id = created.Id }, created);
         }
 
         // PUT: api/posts/5
+        [Authorize(Roles = "Admin,Author")]
         [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UpdatePost(int id, [FromForm] UpdatePostDto dto, IFormFile? photo)
         {
-            var post = await _context.Posts.FindAsync(id);
-
-            if (post == null)
-                return NotFound();
-
+            string? photoUrl = null;
             if (photo != null)
             {
-                var (photoUrl, error) = await TrySavePhotoAsync(photo);
+                var (url, error) = await TrySavePhotoAsync(photo);
                 if (error != null)
                     return BadRequest(error);
 
-                post.PhotoUrl = photoUrl;
+                photoUrl = url;
             }
 
-            post.Title = dto.Title;
-            post.Content = dto.Content;
-            post.Type = post.PhotoUrl != null ? PostType.Blog : PostType.Koseyazisi;
-            post.Status = dto.Status;
-            post.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(ToResponseDto(post));
+            var updated = await _postService.UpdatePostAsync(id, dto, photoUrl);
+            return updated == null ? NotFound() : Ok(updated);
         }
 
         // PUT: api/posts/5/with-photo
+        [Authorize(Roles = "Admin,Author")]
         [HttpPut("{id}/with-photo")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UpdatePostWithPhoto(int id, [FromForm] UpdatePostDto dto, IFormFile? photo)
         {
-            var post = await _context.Posts.FindAsync(id);
-
-            if (post == null)
-                return NotFound();
-
-            post.Title = dto.Title;
-            post.Content = dto.Content;
-            post.Type = dto.Type;
-            post.Status = dto.Status;
-            post.UpdatedAt = DateTime.UtcNow;
-
+            string? photoUrl = null;
             if (photo != null)
             {
-                var (photoUrl, error) = await TrySavePhotoAsync(photo);
+                var (url, error) = await TrySavePhotoAsync(photo);
                 if (error != null)
                     return BadRequest(error);
 
-                post.PhotoUrl = photoUrl;
-            }
-            else if (!string.IsNullOrEmpty(dto.PhotoUrl))
-            {
-                post.PhotoUrl = dto.PhotoUrl;
+                photoUrl = url;
             }
 
-            await _context.SaveChangesAsync();
-
-            return Ok(ToResponseDto(post));
+            var updated = await _postService.UpdatePostWithPhotoAsync(id, dto, photoUrl);
+            return updated == null ? NotFound() : Ok(updated);
         }
 
         // DELETE: api/posts/5
+        [Authorize(Roles = "Admin,Author")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePost(int id)
         {
-            var post = await _context.Posts.FindAsync(id);
-
-            if (post == null)
-                return NotFound();
-
-            _context.Posts.Remove(post);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            var deleted = await _postService.DeletePostAsync(id);
+            return deleted ? NoContent() : NotFound();
         }
 
         // POST: api/posts/5/admin-delete
+        [Authorize(Roles = "Admin")]
         [HttpPost("{id}/admin-delete")]
         public async Task<IActionResult> AdminDeletePost(int id, [FromBody] AdminDeletePostDto dto)
         {
-            var post = await _context.Posts.FindAsync(id);
-
-            if (post == null)
+            var deletedTitle = await _postService.AdminDeletePostAsync(id);
+            if (deletedTitle == null)
                 return NotFound(new { message = "Yazı bulunamadı." });
 
-            _context.Posts.Remove(post);
-            await _context.SaveChangesAsync();
+            return Ok(new { success = true, message = $"'{deletedTitle}' başlıklı yazı kaldırıldı." });
+        }
 
-            return Ok(new { success = true, message = $"'{post.Title}' başlıklı yazı kaldırıldı." });
+        private Guid GetCurrentUserId()
+        {
+            // MapInboundClaims ayarına bağlı olarak claim ismi "nameid" (kısa) veya tam
+            // ClaimTypes.NameIdentifier URI'si olarak gelebilir; ikisini de kontrol ediyoruz.
+            var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("nameid")
+                ?? User.FindFirstValue("sub");
+
+            return Guid.TryParse(idClaim, out var userId) ? userId : Guid.Empty;
         }
 
         private async Task<(string? PhotoUrl, string? Error)> TrySavePhotoAsync(IFormFile file)
@@ -205,18 +174,5 @@ namespace BlogSite.API.Controllers
 
             return ($"/uploads/posts/{fileName}", null);
         }
-
-        private static PostResponseDto ToResponseDto(Post post) => new()
-        {
-            Id = post.Id,
-            Title = post.Title,
-            Content = post.Content,
-            Type = post.Type,
-            Status = post.Status,
-            PhotoUrl = post.PhotoUrl,
-            AuthorId = post.AuthorId,
-            CreatedAt = post.CreatedAt,
-            UpdatedAt = post.UpdatedAt
-        };
     }
 }

@@ -8,6 +8,7 @@ namespace BlogSite.CORE.Dtos
         public string Content { get; set; } = string.Empty;
         public PostType Type { get; set; }
         public string? PhotoUrl { get; set; }
+        public bool RemovePhoto { get; set; }
         public PostStatus Status { get; set; }
     }
 }
