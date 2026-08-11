@@ -104,7 +104,7 @@ public class AuthService : IAuthService
             Role = role,
             University = isAuthor ? request.University?.Trim() : null,
             CvUrl = isAuthor ? request.CvUrl?.Trim() : null,
-            AuthorApprovalStatus = isAuthor ? "Pending" : "Approved",
+            AuthorApprovalStatus = isAuthor ? "Pending" : null,
             AuthorApplicationDate = isAuthor ? DateTime.UtcNow : null,
             IsEmailConfirmed = false,
             EmailConfirmationToken = confirmationToken,

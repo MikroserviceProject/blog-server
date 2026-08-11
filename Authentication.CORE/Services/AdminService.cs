@@ -188,7 +188,7 @@ public class AdminService : IAdminService
             Email = emailNormalized,
             PasswordHash = passwordHash,
             Role = "Admin",
-            AuthorApprovalStatus = "Approved",
+            AuthorApprovalStatus = null,
             IsEmailConfirmed = true,
             CreatedAt = DateTime.UtcNow
         };
