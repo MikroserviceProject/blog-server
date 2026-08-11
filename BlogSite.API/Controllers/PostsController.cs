@@ -28,7 +28,8 @@ namespace BlogSite.API.Controllers
         public async Task<ActionResult<IEnumerable<PostResponseDto>>> GetPosts(
             [FromQuery] PostStatus? status,
             [FromQuery] PostType? type,
-            [FromQuery] Guid? authorId)
+            [FromQuery] Guid? authorId,
+            [FromQuery] string? tag)
         {
             var query = _context.Posts.AsQueryable();
 
@@ -40,6 +41,12 @@ namespace BlogSite.API.Controllers
 
             if (authorId.HasValue && authorId.Value != Guid.Empty)
                 query = query.Where(p => p.AuthorId == authorId.Value);
+
+            if (!string.IsNullOrWhiteSpace(tag))
+            {
+                var lowerTag = tag.Trim().ToLower();
+                query = query.Where(p => p.Tags.Any(t => t.ToLower() == lowerTag));
+            }
 
             var posts = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
 
@@ -68,7 +75,9 @@ namespace BlogSite.API.Controllers
                 Title = dto.Title,
                 Content = dto.Content,
                 Type = dto.Type,
-                Status = dto.Status
+                Status = dto.Status,
+                Tags = dto.Tags ?? Array.Empty<string>(),
+                AuthorId = dto.AuthorId
             };
 
             if (photo != null)
@@ -110,6 +119,7 @@ namespace BlogSite.API.Controllers
             post.Type = post.PhotoUrl != null ? PostType.Blog : PostType.Koseyazisi;
             post.Status = dto.Status;
             post.UpdatedAt = DateTime.UtcNow;
+            if (dto.Tags != null) post.Tags = dto.Tags;
 
             await _context.SaveChangesAsync();
 
@@ -131,6 +141,7 @@ namespace BlogSite.API.Controllers
             post.Type = dto.Type;
             post.Status = dto.Status;
             post.UpdatedAt = DateTime.UtcNow;
+            if (dto.Tags != null) post.Tags = dto.Tags;
 
             if (photo != null)
             {
@@ -216,7 +227,8 @@ namespace BlogSite.API.Controllers
             PhotoUrl = post.PhotoUrl,
             AuthorId = post.AuthorId,
             CreatedAt = post.CreatedAt,
-            UpdatedAt = post.UpdatedAt
+            UpdatedAt = post.UpdatedAt,
+            Tags = post.Tags
         };
     }
 }

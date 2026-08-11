@@ -13,5 +13,6 @@ namespace BlogSite.CORE.Dtos
         public Guid AuthorId { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
+        public string[] Tags { get; set; } = Array.Empty<string>();
     }
 }

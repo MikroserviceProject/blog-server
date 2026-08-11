@@ -169,6 +169,24 @@ public class SmtpEmailService : IEmailService
         return await SendEmailAsync(toEmail, subject, body, isHtml: true);
     }
 
+    public async Task<bool> SendNewAuthorApplicationToAdminAsync(string adminEmail, string adminName, string applicantUsername, string university, string cvUrl)
+    {
+        var subject = $"Yeni Yazar Başvurusu: {applicantUsername}";
+        var clientAppUrl = _configuration["ClientAppUrl"] ?? "http://localhost:4200";
+        var adminPanelUrl = $"{clientAppUrl}/profile?tab=ADMIN_AUTHORS";
+
+        var body = GetMailTemplate(
+            title: "Yeni Yazar Başvurusu Geldi",
+            greeting: $"Merhaba {System.Net.WebUtility.HtmlEncode(adminName)},",
+            message: $"Sistemde <strong>{System.Net.WebUtility.HtmlEncode(applicantUsername)}</strong> adlı kullanıcı yazar olmak için yeni bir başvuru yaptı.<br><br><strong>Üniversite/Bölüm:</strong> {System.Net.WebUtility.HtmlEncode(university)}<br><strong>CV:</strong> Sisteme başarıyla yüklendi.",
+            buttonText: "🔍 Başvuruyu İncele",
+            buttonUrl: adminPanelUrl,
+            note: "Başvuruyu onaylamak veya reddetmek için admin paneline gidebilirsiniz."
+        );
+
+        return await SendEmailAsync(adminEmail, subject, body, isHtml: true);
+    }
+
     public async Task<bool> SendEmailAsync(string toEmail, string subject, string body, bool isHtml = true)
     {
         var host = _configuration["SmtpSettings:Host"];

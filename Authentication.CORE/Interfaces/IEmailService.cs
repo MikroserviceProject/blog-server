@@ -10,5 +10,6 @@ public interface IEmailService
     Task<bool> SendUserBannedEmailAsync(string toEmail, string username, string reason, DateTime? bannedUntil);
     Task<bool> SendPostDeletedEmailAsync(string toEmail, string username, string postTitle, string reason);
     Task<bool> SendAccountDeletionConfirmationAsync(string toEmail, string username, string token);
+    Task<bool> SendNewAuthorApplicationToAdminAsync(string adminEmail, string adminName, string applicantUsername, string university, string cvUrl);
     Task<bool> SendEmailAsync(string toEmail, string subject, string body, bool isHtml = true);
 }

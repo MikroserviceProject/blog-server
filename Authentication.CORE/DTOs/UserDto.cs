@@ -15,6 +15,8 @@ public class UserDto
     public bool IsBanned { get; set; }
     public DateTime? BannedUntil { get; set; }
     public string? BanReason { get; set; }
+    public bool IsDeactivated { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public int UnreadNotificationCount { get; set; }
 }

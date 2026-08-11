@@ -13,5 +13,8 @@ namespace BlogSite.CORE.Entities
         public Guid AuthorId { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
+        
+        // Etiketler özelliği: "Ruby", "Java" vb. için
+        public string[] Tags { get; set; } = Array.Empty<string>();
     }
 }
