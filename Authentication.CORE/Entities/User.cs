@@ -90,6 +90,12 @@ public class User
     public string? AccountDeletionToken { get; set; }
     public DateTime? AccountDeletionTokenExpiresAt { get; set; }
     
+    /// <summary>
+    /// Hesap dondurma (Deactivation) durumu. True ise kullanıcı hesabını dondurmuş demektir.
+    /// Giriş yaptığında tekrar false olarak güncellenir (aktive olur).
+    /// </summary>
+    public bool IsDeactivated { get; set; } = false;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
     public DateTime? LastLoginAt { get; set; }

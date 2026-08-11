@@ -21,9 +21,10 @@ namespace BlogSite.CORE.Services
             PostStatus? status,
             PostType? type,
             Guid? authorId,
-            string? search)
+            string? search,
+            string? tag)
         {
-            var (posts, _) = await _repository.GetAllAsync(status, type, authorId, search, null, null);
+            var (posts, _) = await _repository.GetAllAsync(status, type, authorId, search, tag, null, null);
             return _mapper.Map<List<PostResponseDto>>(posts);
         }
 
@@ -32,10 +33,11 @@ namespace BlogSite.CORE.Services
             PostType? type,
             Guid? authorId,
             string? search,
+            string? tag,
             int page,
             int pageSize)
         {
-            var (posts, totalCount) = await _repository.GetAllAsync(status, type, authorId, search, page, pageSize);
+            var (posts, totalCount) = await _repository.GetAllAsync(status, type, authorId, search, tag, page, pageSize);
 
             return new PagedResultDto<PostResponseDto>
             {
@@ -61,7 +63,8 @@ namespace BlogSite.CORE.Services
                 Type = dto.Type,
                 Status = dto.Status,
                 AuthorId = authorId,
-                PhotoUrl = photoUrl
+                PhotoUrl = photoUrl,
+                Tags = dto.Tags ?? Array.Empty<string>()
             };
 
             await _repository.AddAsync(post);
@@ -89,6 +92,9 @@ namespace BlogSite.CORE.Services
             if (!isDowngradeToDraft)
                 post.Status = dto.Status;
 
+            if (dto.Tags != null)
+                post.Tags = dto.Tags;
+
             post.UpdatedAt = DateTime.UtcNow;
 
             await _repository.SaveChangesAsync();
@@ -105,6 +111,9 @@ namespace BlogSite.CORE.Services
             post.Type = dto.Type;
             post.Status = dto.Status;
             post.UpdatedAt = DateTime.UtcNow;
+
+            if (dto.Tags != null)
+                post.Tags = dto.Tags;
 
             if (newPhotoUrl != null)
                 post.PhotoUrl = newPhotoUrl;

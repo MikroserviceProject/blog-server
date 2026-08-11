@@ -10,6 +10,7 @@ namespace BlogSite.CORE.Repositories.Abstract
             PostType? type,
             Guid? authorId,
             string? search,
+            string? tag,
             int? page,
             int? pageSize);
     }

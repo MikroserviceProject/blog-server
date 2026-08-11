@@ -23,29 +23,31 @@ namespace BlogSite.API.Controllers
             _environment = environment;
         }
 
-        // GET: api/posts?status=Published&type=Blog&authorId=...&search=...
+        // GET: api/posts?status=Published&type=Blog&authorId=...&search=...&tag=...
         [HttpGet]
         public async Task<ActionResult<IEnumerable<PostResponseDto>>> GetPosts(
             [FromQuery] PostStatus? status,
             [FromQuery] PostType? type,
             [FromQuery] Guid? authorId,
-            [FromQuery] string? search)
+            [FromQuery] string? search,
+            [FromQuery] string? tag)
         {
-            var items = await _postService.GetPostsAsync(status, type, authorId, search);
+            var items = await _postService.GetPostsAsync(status, type, authorId, search, tag);
             return Ok(items);
         }
 
-        // GET: api/posts/paged?status=Published&type=Blog&search=...&page=1&pageSize=9
+        // GET: api/posts/paged?status=Published&type=Blog&search=...&tag=...&page=1&pageSize=9
         [HttpGet("paged")]
         public async Task<ActionResult<ApiResponseDto<PagedResultDto<PostResponseDto>>>> GetPagedPosts(
             [FromQuery] PostStatus? status,
             [FromQuery] PostType? type,
             [FromQuery] Guid? authorId,
             [FromQuery] string? search,
+            [FromQuery] string? tag,
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 9)
         {
-            var result = await _postService.GetPagedPostsAsync(status, type, authorId, search, page, pageSize);
+            var result = await _postService.GetPagedPostsAsync(status, type, authorId, search, tag, page, pageSize);
             return Ok(ApiResponseDto<PagedResultDto<PostResponseDto>>.Ok(result));
         }
 

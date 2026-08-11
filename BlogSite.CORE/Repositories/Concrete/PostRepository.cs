@@ -11,7 +11,7 @@ namespace BlogSite.CORE.Repositories.Concrete
         public PostRepository(BlogDbContext context) : base(context) { }
 
         public async Task<(List<Post> Items, int TotalCount)> GetAllAsync(
-            PostStatus? status, PostType? type, Guid? authorId, string? search, int? page, int? pageSize)
+            PostStatus? status, PostType? type, Guid? authorId, string? search, string? tag, int? page, int? pageSize)
         {
             var query = _context.Posts.AsQueryable();
 
@@ -23,6 +23,12 @@ namespace BlogSite.CORE.Repositories.Concrete
             {
                 var term = $"%{search.Trim()}%";
                 query = query.Where(p => EF.Functions.ILike(p.Title, term) || EF.Functions.ILike(p.Content, term));
+            }
+
+            if (!string.IsNullOrWhiteSpace(tag))
+            {
+                var lowerTag = tag.Trim().ToLower();
+                query = query.Where(p => p.Tags.Any(t => t.ToLower() == lowerTag));
             }
 
             query = query.OrderByDescending(p => p.CreatedAt);

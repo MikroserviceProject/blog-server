@@ -13,16 +13,48 @@ namespace AuthenticationService.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IUserProfileService _profileService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthController> _logger;
     private readonly AppDbContext _dbContext;
 
-    public AuthController(IAuthService authService, IConfiguration configuration, ILogger<AuthController> logger, AppDbContext dbContext)
+    public AuthController(IAuthService authService, IUserProfileService profileService, IConfiguration configuration, ILogger<AuthController> logger, AppDbContext dbContext)
     {
         _authService = authService;
+        _profileService = profileService;
         _configuration = configuration;
         _logger = logger;
         _dbContext = dbContext;
+    }
+
+    /// <summary>
+    /// Kullanıcıdan gelen istek veya şikayet bildirimlerini işler.
+    /// </summary>
+    [HttpPost("support-request")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> SupportRequest([FromBody] SupportRequestDto request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ApiResponseDto<bool>.Fail("Geçersiz veya eksik bilgi gönderildi."));
+        }
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(ApiResponseDto<bool>.Fail("Geçersiz oturum."));
+        }
+
+        var result = await _authService.SendSupportRequestAsync(userId, request);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
     }
 
     /// <summary>
@@ -53,39 +85,10 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Swagger / API üzerinden doğrudan Yönetici (Admin) hesabı oluşturur.
-    /// </summary>
-    [HttpPost("create-admin")]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminRequestDto request)
-    {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-
-            return BadRequest(ApiResponseDto<UserDto>.Fail("Geçersiz veri girişi.", errors));
-        }
-
-        var result = await _authService.CreateAdminAsync(request);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// Yazar başvurusu için PDF dosya yüklemeli çok parçalı (multipart/form-data) kayıt endpoint'i.
+    /// Swagger / API üzerinden doğrudan Yazar (Author) hesabı oluşturur.
     /// </summary>
     [HttpPost("register-author")]
     [Consumes("multipart/form-data")]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> RegisterAuthor(
         [FromForm] string username,
         [FromForm] string email,
@@ -282,160 +285,9 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// Giriş yapmış kullanıcının profilinden mevcut şifresini değiştirmesini sağlar.
-    /// </summary>
-    [Authorize]
-    [HttpPost("change-password")]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequestDto request)
-    {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-
-            return BadRequest(ApiResponseDto<bool>.Fail("Geçersiz veri girişi.", errors));
-        }
-
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized(ApiResponseDto<bool>.Fail("Yetkisiz erişim."));
-        }
-
-        var result = await _authService.ChangePasswordAsync(userId, request);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// Giriş yapmış kullanıcının profil bilgilerini günceller.
-    /// </summary>
-    [Authorize]
-    [HttpPut("update-profile")]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequestDto request)
-    {
-        if (!ModelState.IsValid)
-        {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage)
-                .ToList();
-
-            return BadRequest(ApiResponseDto<UserDto>.Fail("Geçersiz veri girişi.", errors));
-        }
-
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized(ApiResponseDto<UserDto>.Fail("Yetkisiz erişim."));
-        }
-
-        var result = await _authService.UpdateProfileAsync(userId, request);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// Kullanıcının profil resmini yükler.
-    /// </summary>
-    [Authorize]
-    [HttpPost("upload-avatar")]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UploadAvatar( IFormFile? file, [FromQuery] string? avatarUrl = null)
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized(ApiResponseDto<UserDto>.Fail("Yetkisiz erişim."));
-        }
-
-        string? finalAvatarUrl = avatarUrl;
-
-        if (file != null && file.Length > 0)
-        {
-            if (file.Length > 5 * 1024 * 1024)
-            {
-                return BadRequest(ApiResponseDto<UserDto>.Fail("Profil resmi boyutu en fazla 5 MB olabilir."));
-            }
-
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
-            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            if (!allowedExtensions.Contains(extension))
-            {
-                return BadRequest(ApiResponseDto<UserDto>.Fail("Desteklenen resim formatları: JPG, PNG, WEBP, GIF."));
-            }
-
-            var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-            var uploadsFolder = Path.Combine(webRoot, "uploads", "avatars");
-            if (!Directory.Exists(uploadsFolder))
-            {
-                Directory.CreateDirectory(uploadsFolder);
-            }
-
-            var uniqueFileName = $"{userId}_{Guid.NewGuid():N}{extension}";
-            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-
-            finalAvatarUrl = $"/uploads/avatars/{uniqueFileName}";
-        }
-        else if (string.IsNullOrWhiteSpace(finalAvatarUrl))
-        {
-            return BadRequest(ApiResponseDto<UserDto>.Fail("Lütfen geçerli bir profil resmi dosyası veya bağlantısı sağlayınız."));
-        }
-
-        var result = await _authService.UpdateAvatarAsync(userId, finalAvatarUrl);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// JWT Token ile giriş yapmış olan kullanıcının profil bilgilerini ve aktif oturum durumunu getirir.
-    /// </summary>
-    [Authorize]
-    [HttpGet("me")]
-    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetCurrentUser()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized(ApiResponseDto<UserDto>.Fail("Yetkisiz erişim. Geçerli bir token bulunamadı."));
-        }
-
-        var sessionTokenClaim = User.FindFirst("session_token")?.Value;
-        var result = await _authService.GetCurrentUserAsync(userId, sessionTokenClaim);
-        if (!result.Success)
-        {
-            return Unauthorized(result);
-        }
-
-        return Ok(result);
-    }
+    // NOT: ChangePassword, UpdateProfile, UploadAvatar ve GetCurrentUser ("me") endpoint'leri
+    // artık UserProfileController.cs içinde (aynı "api/auth" route'unda, IUserProfileService ile).
+    // Burada tekrar tanımlanırsa route çakışması (AmbiguousMatchException) oluşur.
 
     /// <summary>
     /// Bir kullanıcının herkese açık, hassas olmayan profil bilgilerini (kullanıcı adı, profil fotoğrafı)
@@ -495,7 +347,7 @@ public class AuthController : ControllerBase
         }
 
         var sessionTokenClaim = User.FindFirst("session_token")?.Value;
-        var result = await _authService.GetCurrentUserAsync(userId, sessionTokenClaim);
+        var result = await _profileService.GetCurrentUserAsync(userId, sessionTokenClaim);
         if (!result.Success)
         {
             return Unauthorized(result);
@@ -504,30 +356,24 @@ public class AuthController : ControllerBase
         return Ok(ApiResponseDto<bool>.Ok(true, "Oturum aktif."));
     }
 
-    #region Admin Yazar & Kullanıcı Moderasyon Endpoint'leri
 
     /// <summary>
-    /// [Admin] Tüm yazar başvurularını listeler.
+    /// Giriş yapmış kullanıcının kendi isteğiyle hesabını dondurmasını (askıya almasını) sağlar.
+    /// Tekrar giriş yaptığında hesap otomatik olarak aktifleşir.
     /// </summary>
-    [Authorize(Roles = "Admin")]
-    [HttpGet("admin/author-applications")]
-    [ProducesResponseType(typeof(ApiResponseDto<List<AuthorApplicationDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAuthorApplications()
-    {
-        var result = await _authService.GetAuthorApplicationsAsync();
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// [Admin] Yazar başvurusunu onaylar ve aktivasyon maili tetikler.
-    /// </summary>
-    [Authorize(Roles = "Admin")]
-    [HttpPost("admin/approve-author/{id}")]
+    [Authorize]
+    [HttpPost("deactivate-account")]
     [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ApproveAuthor(Guid id)
+    public async Task<IActionResult> DeactivateAccount()
     {
-        var result = await _authService.ApproveAuthorApplicationAsync(id);
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(ApiResponseDto<bool>.Fail("Geçersiz oturum."));
+        }
+
+        var result = await _authService.DeactivateAccountAsync(userId);
         if (!result.Success)
         {
             return BadRequest(result);
@@ -537,105 +383,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Admin] Yazar başvurusunu gerekçesiyle birlikte reddeder.
-    /// </summary>
-    [Authorize(Roles = "Admin")]
-    [HttpPost("admin/reject-author/{id}")]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> RejectAuthor(Guid id, [FromBody] RejectAuthorRequestDto? request)
-    {
-        var result = await _authService.RejectAuthorApplicationAsync(id, request?.Reason);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// [Admin] Sistemdeki tüm kayıtlı kullanıcıları listeler.
-    /// </summary>
-    [Authorize(Roles = "Admin")]
-    [HttpGet("admin/users")]
-    [ProducesResponseType(typeof(ApiResponseDto<List<UserDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAllUsers()
-    {
-        var result = await _authService.GetAllUsersAsync();
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// [Admin] Kullanıcıyı süreli veya süresiz askıya alır (banlar) ve mail gönderir.
-    /// </summary>
-    [Authorize(Roles = "Admin")]
-    [HttpPost("admin/ban-user")]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> BanUser([FromBody] BanUserRequestDto request)
-    {
-        if (request.UserId == Guid.Empty || string.IsNullOrWhiteSpace(request.GetEffectiveReason()))
-        {
-            return BadRequest(ApiResponseDto<bool>.Fail("Lütfen geçerli bir kullanıcı ve en az 3 karakterli ban gerekçesi belirtiniz."));
-        }
-
-        var result = await _authService.BanUserAsync(request);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// [Admin] Kullanıcının banını kaldırır.
-    /// </summary>
-    [Authorize(Roles = "Admin")]
-    [HttpPost("admin/unban-user/{id}")]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UnbanUser(Guid id)
-    {
-        var result = await _authService.UnbanUserAsync(id);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// [Admin] Kullanıcıya özel sistem içi bildirim / uyarı iletir.
-    /// </summary>
-    [Authorize(Roles = "Admin")]
-    [HttpPost("admin/notify-user")]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> NotifyUser([FromBody] AdminSendNotificationDto request)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ApiResponseDto<bool>.Fail("Başlık ve mesaj içeriği zorunludur."));
-        }
-
-        var result = await _authService.SendAdminNotificationAsync(request);
-        if (!result.Success)
-        {
-            return BadRequest(result);
-        }
-
-        return Ok(result);
-    }
-
-    #endregion
-
-    #region Hesap Silme & Bildirim Endpoint'leri
-
-    /// <summary>
-    /// Kullanıcı hesap silme talebinde bulunur, e-posta adresine onay linki gönderilir.
+    /// Kullanıcının hesap silme talebini başlatır, e-postaya onay bağlantısı gönderir.
     /// </summary>
     [Authorize]
     [HttpPost("request-account-deletion")]
@@ -664,7 +412,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpGet("confirm-account-deletion")]
     [HttpGet("confirm-delete-account")]
-    public async Task<IActionResult> ConfirmDeleteAccountGet([FromQuery] string? email, [FromQuery] string? token)
+    public IActionResult ConfirmDeleteAccountGet([FromQuery] string? email, [FromQuery] string? token)
     {
         var clientAppUrl = _configuration["ClientAppUrl"] ?? "http://localhost:4200";
 
@@ -699,43 +447,4 @@ public class AuthController : ControllerBase
 
         return Ok(result);
     }
-
-    /// <summary>
-    /// Kullanıcının sistem içi bildirimlerini listeler.
-    /// </summary>
-    [Authorize]
-    [HttpGet("notifications")]
-    [ProducesResponseType(typeof(ApiResponseDto<List<UserNotificationDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetNotifications()
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized(ApiResponseDto<List<UserNotificationDto>>.Fail("Geçersiz oturum."));
-        }
-
-        var result = await _authService.GetUserNotificationsAsync(userId);
-        return Ok(result);
-    }
-
-    /// <summary>
-    /// Bildirimi okundu olarak işaretler.
-    /// </summary>
-    [Authorize]
-    [HttpPost("notifications/{id}/read")]
-    [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> MarkNotificationAsRead(Guid id)
-    {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized(ApiResponseDto<bool>.Fail("Geçersiz oturum."));
-        }
-
-        var result = await _authService.MarkNotificationAsReadAsync(userId, id);
-        return Ok(result);
-    }
-
-    #endregion
-
 }

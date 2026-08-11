@@ -9,13 +9,15 @@ namespace BlogSite.CORE.Services
             PostStatus? status,
             PostType? type,
             Guid? authorId,
-            string? search);
+            string? search,
+            string? tag);
 
         Task<PagedResultDto<PostResponseDto>> GetPagedPostsAsync(
             PostStatus? status,
             PostType? type,
             Guid? authorId,
             string? search,
+            string? tag,
             int page,
             int pageSize);
 
