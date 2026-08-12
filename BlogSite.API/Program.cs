@@ -16,9 +16,9 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseCors(BlogApiServiceExtensions.DevCorsPolicy);
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseCors(BlogApiServiceExtensions.DevCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

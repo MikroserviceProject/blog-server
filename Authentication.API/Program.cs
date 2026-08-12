@@ -1,11 +1,10 @@
 using AuthenticationService.API.Extensions;
 using AuthenticationService.API.Middlewares;
-using AuthenticationService.API.Hubs;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Register Application Services (Controllers, DB, DI, AutoMapper, SignalR)
+// 1. Register Application Services (Controllers, DB, DI, AutoMapper)
 builder.Services.AddApplicationServices(builder.Configuration);
 
 // 2. Register JWT Authentication & Authorization
@@ -52,8 +51,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<BanCheckMiddleware>();
 
-// 9. Endpoints & Hubs
+// 9. Endpoints
 app.MapControllers();
-app.MapHub<AppHub>("/hubs/app");
 
 app.Run();
