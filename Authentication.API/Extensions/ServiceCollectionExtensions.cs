@@ -37,9 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IAdminService, AdminService>();
-        services.AddScoped<IRealTimeNotificationService, AuthenticationService.API.Services.RealTimeNotificationService>();
 
-        services.AddSignalR();
         return services;
     }
 
@@ -69,20 +67,6 @@ public static class ServiceCollectionExtensions
                 ValidAudience = jwtAudience,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.Zero
-            };
-            
-            options.Events = new JwtBearerEvents
-            {
-                OnMessageReceived = context =>
-                {
-                    var accessToken = context.Request.Query["access_token"];
-                    var path = context.HttpContext.Request.Path;
-                    if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/app"))
-                    {
-                        context.Token = accessToken;
-                    }
-                    return Task.CompletedTask;
-                }
             };
         });
 

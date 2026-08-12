@@ -22,7 +22,6 @@ public class AdminService : IAdminService
     private readonly IConfiguration _configuration;
     private readonly ILogger<AdminService> _logger;
     private readonly IEmailService _emailService;
-    private readonly IRealTimeNotificationService _realTimeService;
 
     public AdminService(
         IUnitOfWork unitOfWork,
@@ -30,8 +29,7 @@ public class AdminService : IAdminService
         IPasswordHasher passwordHasher,
         IConfiguration configuration,
         ILogger<AdminService> logger,
-        IEmailService emailService,
-        IRealTimeNotificationService realTimeService)
+        IEmailService emailService)
     {
         _unitOfWork = unitOfWork;
         _mapper = mapper;
@@ -39,7 +37,6 @@ public class AdminService : IAdminService
         _configuration = configuration;
         _logger = logger;
         _emailService = emailService;
-        _realTimeService = realTimeService;
     }
 
 
@@ -92,7 +89,6 @@ public class AdminService : IAdminService
 
         await _unitOfWork.SaveChangesAsync();
 
-        await _realTimeService.SendNewNotificationAsync(user.Id.ToString());
 
         try
         {
@@ -132,7 +128,6 @@ public class AdminService : IAdminService
 
         await _unitOfWork.SaveChangesAsync();
 
-        await _realTimeService.SendNewNotificationAsync(user.Id.ToString());
 
         try
         {
@@ -267,9 +262,6 @@ public class AdminService : IAdminService
 
         await _unitOfWork.SaveChangesAsync();
 
-        // Anında kullanıcıyı dışarı atmak için SignalR bildirimi gönder
-        await _realTimeService.SendUserBannedAsync(user.Id.ToString(), $"Hesabınız askıya alındı. Sebep: {reason}");
-
         // Kullanıcıya e-posta gönder
         try
         {
@@ -314,7 +306,6 @@ public class AdminService : IAdminService
 
         await _unitOfWork.SaveChangesAsync();
 
-        await _realTimeService.SendNewNotificationAsync(user.Id.ToString());
 
         return ApiResponseDto<bool>.Ok(true, $"'{user.Username}' kullanıcısının engeli başarıyla kaldırıldı.");
     }
@@ -342,7 +333,6 @@ public class AdminService : IAdminService
         await _unitOfWork.Repository<UserNotification>().AddAsync(notification);
         await _unitOfWork.SaveChangesAsync();
 
-        await _realTimeService.SendNewNotificationAsync(user.Id.ToString());
 
         return ApiResponseDto<bool>.Ok(true, $"'{user.Username}' kullanıcısına sistem içi bildirim iletildi.");
     }
