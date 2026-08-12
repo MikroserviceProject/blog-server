@@ -11,7 +11,7 @@ public interface IUserProfileService
     Task<ApiResponseDto<bool>> ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request);
     
     // Bildirimler
-    Task<ApiResponseDto<List<UserNotificationDto>>> GetUserNotificationsAsync(Guid userId);
+    Task<ApiResponseDto<PaginatedResultDto<UserNotificationDto>>> GetUserNotificationsAsync(Guid userId, int page = 1, int pageSize = 10, bool unreadOnly = false);
     Task<ApiResponseDto<bool>> MarkNotificationAsReadAsync(Guid userId, Guid notificationId);
 
     Task<ApiResponseDto<bool>> ApplyForAuthorAsync(Guid userId, string university, string cvUrl);

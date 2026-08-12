@@ -270,16 +270,16 @@ public class UserProfileController : ControllerBase
     /// </summary>
     [Authorize]
     [HttpGet("notifications")]
-    [ProducesResponseType(typeof(ApiResponseDto<List<UserNotificationDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetNotifications()
+    [ProducesResponseType(typeof(ApiResponseDto<PaginatedResultDto<UserNotificationDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetNotifications([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] bool unreadOnly = false)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
         {
-            return Unauthorized(ApiResponseDto<List<UserNotificationDto>>.Fail("Geçersiz oturum."));
+            return Unauthorized(ApiResponseDto<PaginatedResultDto<UserNotificationDto>>.Fail("Geçersiz oturum."));
         }
 
-        var result = await _profileService.GetUserNotificationsAsync(userId);
+        var result = await _profileService.GetUserNotificationsAsync(userId, page, pageSize, unreadOnly);
         return Ok(result);
     }
 

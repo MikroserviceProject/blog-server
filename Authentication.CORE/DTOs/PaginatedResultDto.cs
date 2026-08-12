@@ -10,4 +10,5 @@ public class PaginatedResultDto<T>
 
     public bool HasPreviousPage => CurrentPage > 1;
     public bool HasNextPage => CurrentPage < TotalPages;
+    public Dictionary<string, object> ExtraData { get; set; } = new Dictionary<string, object>();
 }

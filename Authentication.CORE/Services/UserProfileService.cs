@@ -254,16 +254,39 @@ public class UserProfileService : IUserProfileService
     }
 
 
-    public async Task<ApiResponseDto<List<UserNotificationDto>>> GetUserNotificationsAsync(Guid userId)
+    public async Task<ApiResponseDto<PaginatedResultDto<UserNotificationDto>>> GetUserNotificationsAsync(Guid userId, int page = 1, int pageSize = 10, bool unreadOnly = false)
     {
-        var notifications = await _unitOfWork.Repository<UserNotification>().Query()
-            .Where(n => n.UserId == userId)
+        var query = _unitOfWork.Repository<UserNotification>().Query()
+            .Where(n => n.UserId == userId);
+
+        if (unreadOnly)
+        {
+            query = query.Where(n => !n.IsRead);
+        }
+
+        var totalCount = await query.CountAsync();
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+        var unreadCount = await _unitOfWork.Repository<UserNotification>().Query().CountAsync(n => n.UserId == userId && !n.IsRead);
+
+        var notifications = await query
             .OrderByDescending(n => n.CreatedAt)
-            .Take(50)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
         var notificationDtos = _mapper.Map<List<UserNotificationDto>>(notifications);
-        return ApiResponseDto<List<UserNotificationDto>>.Ok(notificationDtos);
+
+        var result = new PaginatedResultDto<UserNotificationDto>
+        {
+            Items = notificationDtos,
+            TotalCount = totalCount,
+            TotalPages = totalPages,
+            CurrentPage = page,
+            PageSize = pageSize
+        };
+        result.ExtraData["UnreadCount"] = unreadCount;
+
+        return ApiResponseDto<PaginatedResultDto<UserNotificationDto>>.Ok(result);
     }
 
 
