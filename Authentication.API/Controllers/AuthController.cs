@@ -8,7 +8,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthenticationService.API.Controllers;
 
+// [ApiController]: Bu nitelik (attribute), sınıfın bir API Controller olduğunu belirtir. 
+// Otomatik model doğrulama (ModelState validation) ve hata yanıtları gibi özellikleri etkinleştirir.
 [ApiController]
+// [Route]: API'nin erişileceği URL şemasını belirler. "[controller]" ifadesi, 
+// çalışma zamanında sınıfın adı olan "Auth" (Controller kelimesi atılır) ile değiştirilir. 
+// Yani bu API uç noktalarına (endpoints) "api/auth" adresinden erişilir.
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
@@ -18,6 +23,10 @@ public class AuthController : ControllerBase
     private readonly ILogger<AuthController> _logger;
     private readonly AppDbContext _dbContext;
 
+    // Constructor (Yapıcı Metot) ve Dependency Injection (Bağımlılık Enjeksiyonu):
+    // ASP.NET Core, bu Controller'ı oluştururken ihtiyaç duyduğu servisleri (IAuthService, vb.) 
+    // yerleşik IoC (Inversion of Control) konteynerinden otomatik olarak sağlar (enjekte eder).
+    // Bu sayede sınıflar arası bağımlılıklar gevşetilmiş (loosely coupled) olur ve test edilebilirlik artar.
     public AuthController(IAuthService authService, IUserProfileService profileService, IConfiguration configuration, ILogger<AuthController> logger, AppDbContext dbContext)
     {
         _authService = authService;
@@ -30,13 +39,20 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Kullanıcıdan gelen istek veya şikayet bildirimlerini işler.
     /// </summary>
+    // [HttpPost]: Bu metodun yalnızca HTTP POST isteklerine yanıt vereceğini belirtir. 
+    // Genellikle sunucuya yeni veri göndermek veya bir işlem başlatmak için kullanılır.
     [HttpPost("support-request")]
+    // [Authorize]: Bu endpoint'e sadece kimliği doğrulanmış (geçerli bir JWT token'ı olan) kullanıcıların erişebileceğini belirtir.
     [Authorize]
     [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    // DTO (Data Transfer Object): İstemci (Client) ile sunucu arasında taşınacak veriyi tanımlayan basit sınıflardır.
+    // Güvenlik ve performans için veritabanı modelleri (Entity) yerine DTO'lar kullanılır.
+    // [FromBody]: Gelen HTTP isteğinin gövdesindeki (body) JSON verisinin SupportRequestDto nesnesine bağlanacağını (bind) ifade eder.
     public async Task<IActionResult> SupportRequest([FromBody] SupportRequestDto request)
     {
+        // Model doğrulaması (Validation): İstemciden gelen verilerin DTO üzerindeki kurallara uyup uymadığını kontrol eder.
         if (!ModelState.IsValid)
         {
             return BadRequest(ApiResponseDto<bool>.Fail("Geçersiz veya eksik bilgi gönderildi."));
@@ -48,6 +64,8 @@ public class AuthController : ControllerBase
             return Unauthorized(ApiResponseDto<bool>.Fail("Geçersiz oturum."));
         }
 
+        // Akış (Flow): Kontrol katmanı (Controller), iş mantığını (Business Logic) kendi içinde yazmaz.
+        // İlgili servise (Service Layer) parametreleri gönderir ve dönen sonuca göre HTTP yanıtı oluşturur.
         var result = await _authService.SendSupportRequestAsync(userId, request);
         if (!result.Success)
         {
@@ -178,6 +196,7 @@ public class AuthController : ControllerBase
     /// <summary>
     /// E-posta onay linki tıklandığında (GET isteğiyle) hesabı doğrular ve frontend sayfasına yönlendirir.
     /// </summary>
+    // [HttpGet]: Bu metodun HTTP GET isteklerine yanıt vereceğini belirtir. Veri okumak veya link yönlendirmeleri için kullanılır.
     [HttpGet("confirm-email")]
     public async Task<IActionResult> ConfirmEmailGet([FromQuery] string? email, [FromQuery] string? token)
     {

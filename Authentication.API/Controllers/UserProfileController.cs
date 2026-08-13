@@ -6,13 +6,19 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AuthenticationService.API.Controllers;
 
+// [ApiController]: Bu sınıfın bir API Controller olduğunu belirtir ve ModelState doğrulaması gibi işlemlerin otomatik yapılmasını sağlar.
 [ApiController]
+// [Route]: İstemcilerin (client) bu controller'daki endpointlere hangi URL üzerinden (örn: /api/auth) erişeceğini belirler.
 [Route("api/auth")]
 public class UserProfileController : ControllerBase
 {
     private readonly IUserProfileService _profileService;
     private readonly ILogger<UserProfileController> _logger;
 
+    // Constructor (Yapıcı Metot) - Dependency Injection (Bağımlılık Enjeksiyonu):
+    // ASP.NET Core IoC (Inversion of Control) container'ı, gerekli servisleri (IUserProfileService ve ILogger) 
+    // buraya otomatik olarak enjekte eder (Dependency Injection).
+    // Böylece controller nesne üretim süreçlerinden bağımsızlaşarak Gevşek Bağımlı (Loosely Coupled) hale gelir.
     public UserProfileController(IUserProfileService profileService, ILogger<UserProfileController> logger)
     {
         _profileService = profileService;
@@ -22,36 +28,46 @@ public class UserProfileController : ControllerBase
     /// <summary>
     /// Kullanıcı hesabını dondurur.
     /// </summary>
+    // [Authorize]: Sadece yetkilendirilmiş (geçerli bir JWT token sunan) kullanıcıların erişimine izin verir. Token yoksa veya geçersizse 401 Unauthorized döner.
     [Authorize]
+    // [HttpPost]: Bu metoda "POST /api/auth/deactivate" şeklinde istek atılabileceğini belirtir.
     [HttpPost("deactivate")]
     [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeactivateAccount()
     {
+        // İstekte bulunan kullanıcının Token'ı içindeki NameIdentifier (genelde Kullanıcı ID) bilgisini okuruz.
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
         {
             return Unauthorized(ApiResponseDto<bool>.Fail("Yetkisiz erişim."));
         }
 
+        // İş mantığı (Business Logic) servis katmanına devredilir, Controller sadece trafiği yönlendirir.
         var result = await _profileService.DeactivateAccountAsync(userId);
         if (!result.Success)
         {
+            // İşlem başarısız olursa HTTP 400 döner.
             return BadRequest(result);
         }
 
+        // İşlem başarılı olursa HTTP 200 döner.
         return Ok(result);
     }
 
     /// <summary>
     /// Kullanıcı şifresini değiştirir.
     /// </summary>
+    // [Authorize]: Yetkisiz erişimleri engeller.
     [Authorize]
     [HttpPost("change-password")]
     [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponseDto<bool>), StatusCodes.Status400BadRequest)]
+    // [FromBody]: Gelen HTTP isteğinin (Request) gövdesinden (Body) JSON verisini alıp 'request' nesnesine dönüştürür (Deserialization).
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequestDto request)
     {
+        // ModelState: Gelen modelin kurallara (örn. Data Annotations) uygun olup olmadığını denetler. 
+        // [ApiController] kullanımı sayesinde aslında bu kontrol otomatiktir, ancak burada manuel hata döndürülmek istenmiştir.
         if (!ModelState.IsValid)
         {
             var errors = ModelState.Values
@@ -62,6 +78,7 @@ public class UserProfileController : ControllerBase
             return BadRequest(ApiResponseDto<bool>.Fail("Geçersiz veri girişi.", errors));
         }
 
+        // Token'dan aktif kullanıcı bilgisini çekiyoruz.
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
         {
@@ -242,7 +259,9 @@ public class UserProfileController : ControllerBase
     /// JWT Token ile giriş yapmış olan kullanıcının profil bilgilerini ve aktif oturum durumunu getirir.
 
     /// </summary>
+    // [Authorize]: Kullanıcının kimliğinin doğrulanmış olması şartını koşar.
     [Authorize]
+    // [HttpGet]: Veri okuma/getirme işlemleri için kullanılan HTTP Get metodudur. "GET /api/auth/me" yolunda çalışır.
     [HttpGet("me")]
     [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -254,7 +273,10 @@ public class UserProfileController : ControllerBase
             return Unauthorized(ApiResponseDto<UserDto>.Fail("Yetkisiz erişim. Geçerli bir token bulunamadı."));
         }
 
+        // Kullanıcının oluşturulan oturum token bilgisini claims üzerinden okuruz (Gelişmiş Güvenlik/Oturum Yönetimi).
         var sessionTokenClaim = User.FindFirst("session_token")?.Value;
+        
+        // Servis katmanından kullanıcının verilerini ve aktif oturum bilgilerini talep ederiz.
         var result = await _profileService.GetCurrentUserAsync(userId, sessionTokenClaim);
         if (!result.Success)
         {

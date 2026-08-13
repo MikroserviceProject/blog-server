@@ -23,6 +23,11 @@ public class UserProfileService : IUserProfileService
     private readonly ILogger<UserProfileService> _logger;
     private readonly IEmailService _emailService;
 
+    // EĞİTSEL NOT (Dependency Injection - DI):
+    // Bu constructor, bağımlılıkların dışarıdan enjekte edilmesini (Dependency Injection) sağlar.
+    // DI deseni sayesinde, sınıf kendi bağımlılıklarını yaratmak (new'lemek) zorunda kalmaz.
+    // Bu durum; test edilebilirliği (mock objeler verilebilir) artırır, sınıflar arası sıkı bağımlılığı (tight coupling) azaltır
+    // ve IoC (Inversion of Control) prensibini uygulayarak nesne yönetimini ASP.NET Core DI Container'ına bırakır.
     public UserProfileService(
         IUnitOfWork unitOfWork,
         IMapper mapper,
@@ -42,6 +47,11 @@ public class UserProfileService : IUserProfileService
 
     public async Task<ApiResponseDto<UserDto>> UpdateProfileAsync(Guid userId, UpdateProfileRequestDto request)
     {
+        // EĞİTSEL NOT (İlişkili Varlıkları Getirme - Fetching Related Entities):
+        // Burada sadece 'User' varlığı (entity) getiriliyor. Eğer User tablosuna bağlı ilişkili başka veriler 
+        // (örneğin kullanıcının rolleri veya yazıları) olsaydı ve onlara da ihtiyaç duysaydık, Entity Framework Core'un 
+        // 'Eager Loading' özelliğini kullanarak .Include(u => u.Roles) veya ilişkili repository'ler üzerinden 
+        // ilişkili verileri tek bir veritabanı sorgusuyla çekebilirdik.
         var user = await _unitOfWork.Repository<User>().GetByIdAsync(userId);
         if (user == null)
         {
@@ -270,6 +280,11 @@ public class UserProfileService : IUserProfileService
 
         var notifications = await query
             .OrderByDescending(n => n.CreatedAt)
+            // EĞİTSEL NOT (Sayfalama - Pagination):
+            // Skip ve Take metotları, büyük veri setlerini sayfalara bölmek (pagination) için kullanılır.
+            // .Skip((page - 1) * pageSize) -> Bulunduğumuz sayfaya gelene kadar ki önceki kayıtları atlar (Örn: 2. sayfada ilk 10'u atla).
+            // .Take(pageSize) -> Kalan kayıtlar içinden sadece belirtilen sayfa boyutu (pageSize) kadar olanı alır.
+            // Bu yaklaşım, veritabanından yalnızca gösterilecek olan verinin çekilmesini sağlayarak bellek ve işlemci performansını büyük ölçüde artırır.
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

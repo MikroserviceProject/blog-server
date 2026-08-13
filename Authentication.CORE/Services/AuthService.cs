@@ -10,6 +10,10 @@ using Microsoft.Extensions.Logging;
 
 namespace AuthenticationService.Core.Services;
 
+/// <summary>
+/// Kimlik doğrulama, kayıt olma, giriş yapma, şifre sıfırlama gibi kullanıcı yönetim süreçlerini yürüten ana iş sınıfıdır.
+/// Tüm iş kuralları (business logic) ve akışları bu sınıfta işletilir.
+/// </summary>
 public class AuthService : IAuthService
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -26,6 +30,12 @@ public class AuthService : IAuthService
         "User", "Author"
     };
 
+    /// <summary>
+    /// Kurucu metot (Constructor). Dependency Injection (Bağımlılık Enjeksiyonu) deseni kullanılarak
+    /// gerekli veri tabanı (IUnitOfWork), haritalama (IMapper), şifreleme (IPasswordHasher),
+    /// JWT (IJwtService) ve e-posta (IEmailService) servisleri bu sınıfa enjekte edilir.
+    /// Bu sayede sınıfın test edilebilirliği ve esnekliği artırılır.
+    /// </summary>
     public AuthService(
         IUnitOfWork unitOfWork,
         IMapper mapper,
@@ -44,6 +54,16 @@ public class AuthService : IAuthService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Sisteme yeni bir kullanıcı veya yazar (Author) kaydetmek için kullanılan metottur.
+    /// İş Akışı:
+    /// 1. Şifrenin belirlenen güvenlik kurallarına uyup uymadığı kontrol edilir.
+    /// 2. Seçilen üyelik planı doğrulanır (Admin doğrudan kayıt olamaz). Yazar ise üniversite bilgisi kontrol edilir.
+    /// 3. E-posta ve kullanıcı adı benzersizlik kontrolünden geçirilir.
+    /// 4. Şifre geri döndürülemez bir şekilde (hash) şifrelenir.
+    /// 5. Veritabanına kayıt işlemi başlatılır ancak önce e-posta onayı için mail atılması denenir. Mail gitmezse kayıt iptal edilir.
+    /// 6. Yazar kaydı ise, sistemdeki adminlere yeni başvuru için bildirim oluşturulur.
+    /// </summary>
     public async Task<ApiResponseDto<UserDto>> RegisterAsync(RegisterRequestDto request)
     {
         // 1. Şifre güçlülük kontrolü (backend tarafı ikinci katman doğrulama)
@@ -92,6 +112,9 @@ public class AuthService : IAuthService
         }
 
         // 5. Şifre hashleme ve kullanıcı oluşturma
+        // Hashing (Özetleme): Kullanıcının düz metin (plain-text) şifresini, matematiksel bir algoritma
+        // (örneğin BCrypt, Argon2 veya SHA256) kullanarak geri döndürülemez karmaşık bir metne dönüştürme işlemidir.
+        // Bu, veritabanı sızdırılsa bile şifrelerin güvenliğini sağlar.
         var passwordHash = _passwordHasher.HashPassword(request.Password);
         var confirmationToken = Guid.NewGuid().ToString("N");
 
@@ -162,6 +185,15 @@ public class AuthService : IAuthService
         }
     }
 
+    /// <summary>
+    /// Kullanıcının sisteme giriş yapmasını sağlayan metottur.
+    /// İş Akışı:
+    /// 1. Veritabanında kullanıcı adı veya e-posta ile kullanıcı aranır.
+    /// 2. Kullanıcının girdiği şifre (düz metin) ile veritabanındaki şifre özeti (hash) karşılaştırılır.
+    /// 3. Yazar ise onay durumu, tüm kullanıcılar için de ban veya hesap dondurma durumları kontrol edilir.
+    /// 4. E-posta adresi doğrulanmamışsa girişe izin verilmez.
+    /// 5. Yeni bir oturum açılır, kimlik doğrulama aracı olarak kullanılacak JWT (JSON Web Token) üretilir ve döndürülür.
+    /// </summary>
     public async Task<ApiResponseDto<LoginResponseDto>> LoginAsync(LoginRequestDto request)
     {
         var identifier = request.EmailOrUsername.Trim().ToLower();
@@ -234,7 +266,10 @@ public class AuthService : IAuthService
         user.LastLoginAt = DateTime.UtcNow;
         await _unitOfWork.SaveChangesAsync();
 
-        // JWT token üretimi
+        // JWT (JSON Web Token) üretimi
+        // Kullanıcı giriş yaptıktan sonra ona verilen dijital bir kimlik kartıdır.
+        // Bu token, kullanıcının ID'si, Rolü gibi verileri içerir ve şifrelenerek (imzalanarak) oluşturulur.
+        // Kullanıcı sonraki isteklerinde bu token'ı gönderir; böylece her seferinde şifre girmesine gerek kalmaz.
         var token = _jwtService.GenerateToken(user, out var expiresInMinutes);
 
         var unreadCount = await _unitOfWork.Repository<UserNotification>().Query().CountAsync(n => n.UserId == user.Id && !n.IsRead);

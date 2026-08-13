@@ -23,6 +23,13 @@ public class AdminService : IAdminService
     private readonly ILogger<AdminService> _logger;
     private readonly IEmailService _emailService;
 
+    /// <summary>
+    /// Constructor (Yapıcı Metot) - Dependency Injection (Bağımlılık Enjeksiyonu)
+    /// Sınıfın ihtiyaç duyduğu servisler (IUnitOfWork, IMapper vb.) IoC Container (örneğin ASP.NET Core DI) 
+    /// tarafından otomatik olarak yaratılıp bu constructora parametre olarak gönderilir (enjekte edilir).
+    /// Bu tasarım (DI), sınıflar arası sıkı bağlılığı (tight coupling) azaltır ve birim testlerinde (unit testing)
+    /// sahte (mock) nesneler kullanmamıza olanak tanır.
+    /// </summary>
     public AdminService(
         IUnitOfWork unitOfWork,
         IMapper mapper,
@@ -40,6 +47,12 @@ public class AdminService : IAdminService
     }
 
 
+    /// <summary>
+    /// İş Mantığı (Business Logic): Yazar başvurularını listeleme.
+    /// Repository Deseni (Repository Pattern): Veritabanı sorgularını doğrudan SQL ile yazmak yerine,
+    /// _unitOfWork.Repository<User>() üzerinden soyutlanmış bir koleksiyona erişiriz.
+    /// LINQ kullanılarak veritabanı seviyesinde filtreleme ve sıralama yapılır.
+    /// </summary>
     public async Task<ApiResponseDto<List<AuthorApplicationDto>>> GetAuthorApplicationsAsync()
     {
         var authors = await _unitOfWork.Repository<User>().Query()
@@ -59,6 +72,13 @@ public class AdminService : IAdminService
     }
 
 
+    /// <summary>
+    /// İş Mantığı (Business Logic): Başvurusu bekleyen bir kullanıcıyı yazar olarak onaylama.
+    /// Unit of Work Deseni: Kullanıcının rolü güncellenir ve yeni bir bildirim (UserNotification) eklenir.
+    /// Bu değişikliklerin hepsi Entity Framework'ün izleme mekanizmasında (Change Tracker) bellekte tutulur.
+    /// En sonda çağrılan _unitOfWork.SaveChangesAsync() metodu, tüm bu bekleyen işlemleri tek bir 
+    /// veritabanı Transaction'ı (işlemi) içinde çalıştırır. Biri başarısız olursa hepsi geri alınır (Rollback).
+    /// </summary>
     public async Task<ApiResponseDto<bool>> ApproveAuthorApplicationAsync(Guid authorId)
     {
         var user = await _unitOfWork.Repository<User>().Query().FirstOrDefaultAsync(u => u.Id == authorId && (u.Role == "Author" || u.AuthorApprovalStatus != null));
@@ -103,6 +123,11 @@ public class AdminService : IAdminService
     }
 
 
+    /// <summary>
+    /// İş Mantığı (Business Logic): Yazar başvurusunu reddetme ve kullanıcıya bildirim gönderme süreci.
+    /// Onaylama sürecindeki gibi, state (durum) değişiklikleri (kullanıcının güncellenmesi ve bildirimin eklenmesi)
+    /// _unitOfWork.SaveChangesAsync() anına kadar veritabanına yansımaz, bellekte işlem bekler.
+    /// </summary>
     public async Task<ApiResponseDto<bool>> RejectAuthorApplicationAsync(Guid authorId, string? reason)
     {
         var user = await _unitOfWork.Repository<User>().Query().FirstOrDefaultAsync(u => u.Id == authorId && (u.Role == "Author" || u.AuthorApprovalStatus != null));
