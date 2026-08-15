@@ -2,7 +2,9 @@ using AutoMapper;
 using BlogSite.CORE.Dtos;
 using BlogSite.CORE.Entities;
 using BlogSite.CORE.Enums;
+using BlogSite.CORE.Interfaces;
 using BlogSite.CORE.Repositories.Abstract;
+using Microsoft.Extensions.Logging;
 
 namespace BlogSite.CORE.Services
 {
@@ -10,11 +12,15 @@ namespace BlogSite.CORE.Services
     {
         private readonly IPostRepository _repository;
         private readonly IMapper _mapper;
+        private readonly ISocialServiceClient _socialServiceClient;
+        private readonly ILogger<PostService> _logger;
 
-        public PostService(IPostRepository repository, IMapper mapper)
+        public PostService(IPostRepository repository, IMapper mapper, ISocialServiceClient socialServiceClient, ILogger<PostService> logger)
         {
             _repository = repository;
             _mapper = mapper;
+            _socialServiceClient = socialServiceClient;
+            _logger = logger;
         }
 
         public async Task<List<PostResponseDto>> GetPostsAsync(
@@ -69,6 +75,29 @@ namespace BlogSite.CORE.Services
 
             await _repository.AddAsync(post);
             await _repository.SaveChangesAsync();
+
+            // Bildirim Entegrasyonu
+            if (post.Status == PostStatus.Published)
+            {
+                try
+                {
+                    var followers = await _socialServiceClient.GetFollowersAsync(authorId);
+                    if (followers.Any())
+                    {
+                        // In a real system, you would push these to a message broker (RabbitMQ, Kafka) 
+                        // or call a Notification.API directly. For now, we simulate logging it.
+                        _logger.LogInformation($"[NOTIFICATION] Yazar {authorId} yeni bir yazı (ID: {post.Id}) paylaştı! Toplam {followers.Count} takipçisine bildirim gönderiliyor...");
+                        foreach (var followerId in followers)
+                        {
+                            _logger.LogInformation($" -> {followerId} ID'li kullanıcıya bildirim gönderildi.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Takipçilere bildirim gönderilirken hata oluştu.");
+                }
+            }
 
             return _mapper.Map<PostResponseDto>(post);
         }

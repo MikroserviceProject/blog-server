@@ -14,11 +14,10 @@ namespace AuthenticationService.Core.Data.Repositories;
 /// </summary>
 public class GenericRepository<T> : IGenericRepository<T> where T : class
 {
-    // Veritabanı ile iletişim kurmamızı sağlayan ana bağlam (Context) sınıfı.
+    
     protected readonly AppDbContext _context;
     
-    // DbSet<T>, veritabanındaki tablolara (T tipindeki entity'ye) karşılık gelir. 
-    // LINQ sorgularını tabloya yansıtmak ve CRUD (Oluşturma, Okuma, Güncelleme, Silme) işlemlerini yapmak için kullanılır.
+    
     protected readonly DbSet<T> _dbSet;
 
     public GenericRepository(AppDbContext context)
@@ -95,35 +94,24 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         await _dbSet.AddRangeAsync(entities);
     }
 
-    /// <summary>
-    /// Var olan bir kaydı günceller (Entity State = Modified). 
-    /// .Update() metodu asenkron (async) bir yapıya ihtiyaç duymaz, çünkü sadece RAM üzerindeki nesne state'ini değiştirir.
-    /// </summary>
+    
     public void Update(T entity)
     {
         _dbSet.Update(entity);
     }
 
-    /// <summary>
-    /// Var olan bir kaydı silinmek üzere işaretler (Entity State = Deleted).
-    /// </summary>
-    public void Remove(T entity)
+       public void Remove(T entity)
     {
         _dbSet.Remove(entity);
     }
 
-    /// <summary>
-    /// Birden fazla kaydı toplu şekilde silinmek üzere işaretler.
-    /// </summary>
+   
     public void RemoveRange(IEnumerable<T> entities)
     {
         _dbSet.RemoveRange(entities);
     }
 
-    /// <summary>
-    /// Sorgulanabilir (IQueryable) olarak tabloyu döndürür.
-    /// Veritabanına gitmeden önce (Örn: Include, OrderBy vb.) ekstra filtreler/sorgular ekleyebilmemiz için açık kapı bırakır.
-    /// </summary>
+    
     public IQueryable<T> Query()
     {
         return _dbSet.AsQueryable();

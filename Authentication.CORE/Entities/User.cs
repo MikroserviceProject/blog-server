@@ -70,6 +70,11 @@ public class User
     public string? ProfilePictureUrl { get; set; }
 
     /// <summary>
+    /// Kullanıcının kapak fotoğrafının dosya yolu veya URL adresi.
+    /// </summary>
+    public string? CoverPictureUrl { get; set; }
+
+    /// <summary>
     /// Yazar başvurusu için mezun olunan üniversite.
     /// Her kullanıcı yazar başvurusu yapmayacağı için boş (null) olabilir (?).
     /// </summary>

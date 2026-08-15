@@ -31,6 +31,13 @@ namespace BlogSite.API.Extensions
 
             services.AddScoped<IPostRepository, PostRepository>();
             services.AddScoped<IPostService, PostService>();
+            
+            services.AddHttpClient("SocialApi", client =>
+            {
+                client.BaseAddress = new Uri(configuration["Microservices:SocialApi"] ?? "http://localhost:5002");
+            });
+            services.AddScoped<BlogSite.CORE.Interfaces.ISocialServiceClient, BlogSite.CORE.Services.SocialServiceClient>();
+            
             services.AddAutoMapper(typeof(MappingProfile));
 
             return services;

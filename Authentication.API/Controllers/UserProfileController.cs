@@ -193,6 +193,68 @@ public class UserProfileController : ControllerBase
     }
 
     /// <summary>
+    /// Kullanıcının kapak fotoğrafını yükler.
+    /// </summary>
+    [Authorize]
+    [HttpPost("upload-cover")]
+    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<UserDto>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadCover(IFormFile? file, [FromQuery] string? coverUrl = null)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(ApiResponseDto<UserDto>.Fail("Yetkisiz erişim."));
+        }
+
+        string? finalCoverUrl = coverUrl;
+
+        if (file != null && file.Length > 0)
+        {
+            if (file.Length > 10 * 1024 * 1024)
+            {
+                return BadRequest(ApiResponseDto<UserDto>.Fail("Kapak resmi boyutu en fazla 10 MB olabilir."));
+            }
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".gif" };
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(extension))
+            {
+                return BadRequest(ApiResponseDto<UserDto>.Fail("Desteklenen resim formatları: JPG, PNG, WEBP, GIF."));
+            }
+
+            var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var uploadsFolder = Path.Combine(webRoot, "uploads", "covers");
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            var uniqueFileName = $"{userId}_cover_{Guid.NewGuid():N}{extension}";
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            finalCoverUrl = $"/uploads/covers/{uniqueFileName}";
+        }
+        else if (string.IsNullOrWhiteSpace(finalCoverUrl))
+        {
+            return BadRequest(ApiResponseDto<UserDto>.Fail("Lütfen geçerli bir kapak resmi dosyası veya bağlantısı sağlayınız."));
+        }
+
+        var result = await _profileService.UpdateCoverAsync(userId, finalCoverUrl);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Okur statüsündeki kullanıcının Yazar olmak için başvuru yapmasını sağlar.
     /// </summary>
     [Authorize]
@@ -324,5 +386,41 @@ public class UserProfileController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Herkese açık (Public) profil bilgilerini getirir.
+    /// </summary>
+    [HttpGet("public/profile/{username}")]
+    [ProducesResponseType(typeof(ApiResponseDto<PublicUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPublicProfile(string username)
+    {
+        var result = await _profileService.GetPublicProfileByUsernameAsync(username);
+        if (!result.Success)
+        {
+            return NotFound(result);
+        }
+        return Ok(result);
+    }
 
+    /// <summary>
+    /// Kullanıcı arama (Search). Aktif tüm kullanıcıları kullanıcı adı veya e-posta ile arar.
+    /// </summary>
+    [HttpGet("public/search-users")]
+    [ProducesResponseType(typeof(ApiResponseDto<List<PublicUserDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SearchPublicUsers([FromQuery] string query)
+    {
+        var result = await _profileService.SearchPublicUsersAsync(query);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// ID listesine göre herkese açık profil bilgilerini getirir.
+    /// </summary>
+    [HttpPost("public/bulk-profiles")]
+    [ProducesResponseType(typeof(ApiResponseDto<List<PublicUserDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBulkPublicProfiles([FromBody] List<Guid> userIds)
+    {
+        var result = await _profileService.GetPublicProfilesByIdsAsync(userIds);
+        return Ok(result);
+    }
 }

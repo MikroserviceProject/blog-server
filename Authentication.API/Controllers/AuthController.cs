@@ -323,7 +323,9 @@ public class AuthController : ControllerBase
             {
                 Id = u.Id,
                 Username = u.Username,
-                ProfilePictureUrl = u.ProfilePictureUrl
+                ProfilePictureUrl = u.ProfilePictureUrl,
+                Role = u.Role.ToString(),
+                CreatedAt = u.CreatedAt
             })
             .FirstOrDefaultAsync();
 

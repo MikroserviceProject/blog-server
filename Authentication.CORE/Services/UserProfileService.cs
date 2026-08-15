@@ -135,6 +135,25 @@ public class UserProfileService : IUserProfileService
         return ApiResponseDto<UserDto>.Ok(_mapper.Map<UserDto>(user), "Profil resmi başarıyla güncellendi.");
     }
 
+    public async Task<ApiResponseDto<UserDto>> UpdateCoverAsync(Guid userId, string coverPictureUrl)
+    {
+        var user = await _unitOfWork.Repository<User>().GetByIdAsync(userId);
+        if (user == null)
+        {
+            return ApiResponseDto<UserDto>.Fail("Kullanıcı bulunamadı.");
+        }
+
+        if (user.IsBanned && (!user.BannedUntil.HasValue || user.BannedUntil.Value > DateTime.UtcNow))
+        {
+            return ApiResponseDto<UserDto>.Fail("Hesabınız askıya alınmıştır. Kapak fotoğrafı güncelleyemezsiniz.");
+        }
+
+        user.CoverPictureUrl = string.IsNullOrWhiteSpace(coverPictureUrl) ? null : coverPictureUrl;
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponseDto<UserDto>.Ok(_mapper.Map<UserDto>(user), "Kapak fotoğrafı başarıyla güncellendi.");
+    }
+
     public async Task<ApiResponseDto<bool>> ApplyForAuthorAsync(Guid userId, string university, string cvUrl)
     {
         var user = await _unitOfWork.Repository<User>().GetByIdAsync(userId);
@@ -361,5 +380,79 @@ public class UserProfileService : IUserProfileService
         
         _logger.LogInformation("Kullanıcı hesabını dondurdu: {UserId}", userId);
         return ApiResponseDto<bool>.Ok(true, "Hesabınız başarıyla dondurulmuştur. Tekrar giriş yaptığınızda otomatik olarak aktive edilecektir.");
+    }
+
+    public async Task<ApiResponseDto<PublicUserDto>> GetPublicProfileByUsernameAsync(string username)
+    {
+        var usernameNormalized = username.Trim().ToLower();
+        var user = await _unitOfWork.Repository<User>().Query()
+            .FirstOrDefaultAsync(u => u.Username.ToLower() == usernameNormalized);
+
+        if (user == null)
+            return ApiResponseDto<PublicUserDto>.Fail("Kullanıcı bulunamadı.");
+
+        if (user.IsBanned || user.IsDeactivated)
+            return ApiResponseDto<PublicUserDto>.Fail("Bu profil şu anda kullanılamıyor.");
+
+        var dto = new PublicUserDto
+        {
+            Id = user.Id,
+            Username = user.Username,
+            Role = user.Role,
+            ProfilePictureUrl = user.ProfilePictureUrl,
+            CoverPictureUrl = user.CoverPictureUrl,
+            University = user.University,
+            CreatedAt = user.CreatedAt
+        };
+
+        return ApiResponseDto<PublicUserDto>.Ok(dto);
+    }
+
+    public async Task<ApiResponseDto<List<PublicUserDto>>> SearchPublicUsersAsync(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return ApiResponseDto<List<PublicUserDto>>.Ok(new List<PublicUserDto>());
+
+        var queryNormalized = query.Trim().ToLower();
+
+        var users = await _unitOfWork.Repository<User>().Query()
+            .Where(u => !u.IsBanned && !u.IsDeactivated)
+            .Where(u => u.Username.ToLower().Contains(queryNormalized) || (u.Email != null && u.Email.ToLower().Contains(queryNormalized)))
+            .Take(20)
+            .Select(user => new PublicUserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Role = user.Role,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                CoverPictureUrl = user.CoverPictureUrl,
+                University = user.University,
+                CreatedAt = user.CreatedAt
+            })
+            .ToListAsync();
+
+        return ApiResponseDto<List<PublicUserDto>>.Ok(users);
+    }
+
+    public async Task<ApiResponseDto<List<PublicUserDto>>> GetPublicProfilesByIdsAsync(List<Guid> userIds)
+    {
+        if (userIds == null || !userIds.Any())
+            return ApiResponseDto<List<PublicUserDto>>.Ok(new List<PublicUserDto>());
+
+        var users = await _unitOfWork.Repository<User>().Query()
+            .Where(u => userIds.Contains(u.Id) && !u.IsBanned && !u.IsDeactivated)
+            .Select(user => new PublicUserDto
+            {
+                Id = user.Id,
+                Username = user.Username,
+                Role = user.Role,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                CoverPictureUrl = user.CoverPictureUrl,
+                University = user.University,
+                CreatedAt = user.CreatedAt
+            })
+            .ToListAsync();
+
+        return ApiResponseDto<List<PublicUserDto>>.Ok(users);
     }
 }
