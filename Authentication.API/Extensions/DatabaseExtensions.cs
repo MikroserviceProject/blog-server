@@ -26,6 +26,7 @@ public static class DatabaseExtensions
                     "EmailConfirmationTokenExpiresAt" timestamp with time zone NULL,
                     "CurrentSessionToken" text NULL,
                     "ProfilePictureUrl" text NULL,
+                    "CoverPictureUrl" text NULL,
                     "University" text NULL,
                     "CvUrl" text NULL,
                     "AuthorApprovalStatus" character varying(20) NULL,
@@ -44,6 +45,7 @@ public static class DatabaseExtensions
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Email" ON "Users" ("Email");
                 CREATE UNIQUE INDEX IF NOT EXISTS "IX_Users_Username" ON "Users" ("Username");
+                ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "CoverPictureUrl" text NULL;
                 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "University" text NULL;
                 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "CvUrl" text NULL;
                 ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "AuthorApprovalStatus" character varying(20) NULL;
